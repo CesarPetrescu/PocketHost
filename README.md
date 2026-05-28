@@ -103,11 +103,14 @@ cd go
 go test ./...
 ```
 
-Build Android ARM64 Go daemons:
+Build Android Go daemons:
 
 ```bash
 ./scripts/build-go-android.sh arm64-v8a
+./scripts/build-go-android.sh x86_64 x86
 ```
+
+The x86 and x86_64 emulator ABIs require Android NDK clang wrappers. Install the NDK under `$ANDROID_SDK_ROOT/ndk` or set `ANDROID_NDK_ROOT`.
 
 Build the Android app from Android Studio by opening `android/`.
 

@@ -9,6 +9,35 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GO_DIR="$ROOT_DIR/go"
 JNI_DIR="$ROOT_DIR/android/app/src/main/jniLibs"
+ANDROID_API="${ANDROID_API:-26}"
+ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/Android/Sdk}}"
+NDK_ROOT="${ANDROID_NDK_ROOT:-}"
+
+find_ndk_root() {
+  if [[ -n "$NDK_ROOT" && -d "$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin" ]]; then
+    echo "$NDK_ROOT"
+    return
+  fi
+  if [[ -d "$ANDROID_SDK_ROOT/ndk" ]]; then
+    find "$ANDROID_SDK_ROOT/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1
+  fi
+}
+
+ndk_clang() {
+  local target="$1"
+  local ndk
+  ndk="$(find_ndk_root)"
+  if [[ -z "$ndk" ]]; then
+    echo "Android NDK not found. Set ANDROID_NDK_ROOT or install NDK under $ANDROID_SDK_ROOT/ndk." >&2
+    exit 2
+  fi
+  local cc="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/${target}${ANDROID_API}-clang"
+  if [[ ! -x "$cc" ]]; then
+    echo "Android NDK clang not found: $cc" >&2
+    exit 2
+  fi
+  echo "$cc"
+}
 
 if [[ $# -eq 0 ]]; then
   ABIS=(arm64-v8a)
@@ -22,19 +51,23 @@ cmds=(hostd webd filed ddnsd proxyd)
 
 build_one() {
   local abi="$1"
-  local goarch goarm
+  local goarch goarm cc_target
   case "$abi" in
-    arm64-v8a) goarch="arm64"; goarm="" ;;
-    armeabi-v7a) goarch="arm"; goarm="7" ;;
-    x86) goarch="386"; goarm="" ;;
-    x86_64) goarch="amd64"; goarm="" ;;
+    arm64-v8a) goarch="arm64"; goarm=""; cc_target="" ;;
+    armeabi-v7a) goarch="arm"; goarm="7"; cc_target="" ;;
+    x86) goarch="386"; goarm=""; cc_target="i686-linux-android" ;;
+    x86_64) goarch="amd64"; goarm=""; cc_target="x86_64-linux-android" ;;
     *) echo "Unsupported ABI: $abi" >&2; exit 2 ;;
   esac
 
   mkdir -p "$JNI_DIR/$abi"
   for cmd in "${cmds[@]}"; do
     echo "Building $cmd for $abi"
-    if [[ -n "$goarm" ]]; then
+    if [[ -n "$cc_target" ]]; then
+      local cc
+      cc="$(ndk_clang "$cc_target")"
+      (cd "$GO_DIR" && CC="$cc" CGO_ENABLED=1 GOOS=android GOARCH="$goarch" go build -trimpath -ldflags="-s -w" -o "$JNI_DIR/$abi/lib${cmd}.so" "./cmd/$cmd")
+    elif [[ -n "$goarm" ]]; then
       (cd "$GO_DIR" && CGO_ENABLED=0 GOOS=android GOARCH="$goarch" GOARM="$goarm" go build -trimpath -ldflags="-s -w" -o "$JNI_DIR/$abi/lib${cmd}.so" "./cmd/$cmd")
     else
       (cd "$GO_DIR" && CGO_ENABLED=0 GOOS=android GOARCH="$goarch" go build -trimpath -ldflags="-s -w" -o "$JNI_DIR/$abi/lib${cmd}.so" "./cmd/$cmd")
