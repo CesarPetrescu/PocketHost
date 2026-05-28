@@ -60,6 +60,12 @@ object ProcessSupervisor {
             LogBus.emit(appContext, id, "ERROR", "Missing native binary: ${binary.absolutePath}")
             return
         }
+        val preflightError = spec.preflight(appContext)
+        if (preflightError != null) {
+            update(id, ServiceState.Failed, preflightError)
+            LogBus.emit(appContext, id, "ERROR", preflightError)
+            return
+        }
 
         scope.launch {
             try {
@@ -82,7 +88,7 @@ object ProcessSupervisor {
                 LogBus.emit(appContext, id, "INFO", "Started: ${binary.absolutePath} ${args.joinToString(" ")}")
 
                 streamLogs(appContext, id, process, File(AppPaths.logsDir(appContext), "$id.log"))
-                spec.defaultPort?.let { launchHealthLoop(appContext, id, it) }
+                spec.defaultPort?.let { launchHealthLoop(appContext, id, it, spec.healthPath) }
 
                 val exit = process.waitFor()
                 healthJobs.remove(id)?.cancel()
@@ -142,13 +148,13 @@ object ProcessSupervisor {
     }
 
 
-    private fun launchHealthLoop(context: Context, id: String, port: Int) {
+    private fun launchHealthLoop(context: Context, id: String, port: Int, path: String) {
         healthJobs.remove(id)?.cancel()
         healthJobs[id] = scope.launch {
             var failures = 0
             delay(1_500)
             while (processes[id]?.isAlive == true) {
-                val probe = HealthMonitor.probeLocal(port)
+                val probe = HealthMonitor.probeLocal(port, path)
                 if (probe.ok) {
                     failures = 0
                     update(id, ServiceState.Running, probe.message)

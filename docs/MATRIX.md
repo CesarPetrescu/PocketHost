@@ -21,14 +21,10 @@ libmatrixd.so --addr 127.0.0.1:6167 --data-dir "$APP_FILES/data/matrix"
 Health contract:
 
 ```text
-GET /health
-```
-
-or:
-
-```text
 GET /_matrix/client/versions
 ```
+
+`/health` is useful for custom adapters, but the Android supervisor probes `/_matrix/client/versions` so the selected homeserver proves Matrix-client compatibility rather than only process liveness.
 
 ## Configuration fields the UI should eventually manage
 
@@ -48,3 +44,4 @@ GET /_matrix/client/versions
 - Do not switch between Conduit-family forks against the same database unless the upstream project explicitly supports that migration. Treat Matrix DB ownership as part of the selected binary.
 - Do not bundle Dendrite or any Matrix binary until `NOTICE` records version, source, license, build target, SHA256, and modifications.
 - Do not expose federation publicly until local-only client login and backup/restore have been verified.
+- Do not enable one-click upgrades until backup/restore has been tested against a copy of the selected homeserver data directory.

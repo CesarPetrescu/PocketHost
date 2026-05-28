@@ -39,6 +39,7 @@ Native daemons are packaged under `jniLibs/<abi>/` as `lib<name>.so` files and l
 | proxyd | on | 127.0.0.1:8088 | local service routing |
 | ddnsd | off | 127.0.0.1:8091 | usually unnecessary with tunnels |
 | matrixd | off | 127.0.0.1:6167 | heavier, selected by operator |
+| nextcloudd | off | 127.0.0.1:8081 | isolated Linux-userland launcher only |
 | cloudflared | off | outbound | requires user Cloudflare setup |
 
 ## Matrix decision
@@ -72,6 +73,7 @@ Recommended route model:
 web.example.com    -> http://127.0.0.1:8080
 files.example.com  -> http://127.0.0.1:8090
 matrix.example.com -> http://127.0.0.1:6167
+nextcloud.example.com -> http://127.0.0.1:8081
 ```
 
 Do not commit tunnel credentials. Store config in app-private storage and import it from the UI or debug tooling.
@@ -86,7 +88,7 @@ Do not implement Nextcloud natively. Nextcloud requires a Linux-style PHP/web/da
 - share links later
 - optional tunnel exposure
 
-A future `linux-lab` module can supervise a Termux/proot/VM environment, but it must be isolated from the core app.
+A future `nextcloudd` module can supervise a Termux/proot/VM-style environment, but it must be isolated from the core app and store its runtime under `files/data/nextcloud`.
 
 ## Distribution modes
 

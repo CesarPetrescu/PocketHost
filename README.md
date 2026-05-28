@@ -50,6 +50,7 @@ PocketHost/
   - `ddnsd`
 - Android ARM64 daemon packaging path
 - Matrix binary slot
+- isolated Nextcloud module slot
 - Cloudflare Tunnel binary slot
 - local CI script, Go unit tests, Go formatting checks, and live daemon health/security verification
 - Flywheel process docs and release evidence rules
@@ -75,6 +76,7 @@ android/app/src/main/jniLibs/arm64-v8a/libddnsd.so
 android/app/src/main/jniLibs/arm64-v8a/libproxyd.so
 android/app/src/main/jniLibs/arm64-v8a/libhostd.so
 android/app/src/main/jniLibs/arm64-v8a/libmatrixd.so       optional
+android/app/src/main/jniLibs/arm64-v8a/libnextcloudd.so    optional isolated launcher
 android/app/src/main/jniLibs/arm64-v8a/libcloudflared.so   optional
 ```
 
@@ -145,6 +147,7 @@ See `docs/runbooks/VERIFY_ANDROID_DEVICE.md`.
 - uploads have configurable byte caps and atomic commit behavior
 - raw network SQL is not part of the MVP
 - Matrix database ownership belongs to the selected Matrix binary
+- Nextcloud, when enabled later, must run through an isolated Linux-userland launcher and keep PHP/web/database/runtime state out of the core app database
 - Android logs redact bearer tokens and common secret assignment patterns
 
 ## License

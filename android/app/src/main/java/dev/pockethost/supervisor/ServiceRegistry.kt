@@ -1,7 +1,6 @@
 package dev.pockethost.supervisor
 
 import dev.pockethost.model.ServiceSpec
-import java.io.File
 
 object ServiceRegistry {
     val specs: List<ServiceSpec> = listOf(
@@ -48,7 +47,7 @@ object ServiceRegistry {
             args = { listOf("--addr", "127.0.0.1:8088") },
             env = {
                 mapOf(
-                    "POCKETHOST_PROXY_ROUTES" to "web.local=http://127.0.0.1:8080,files.local=http://127.0.0.1:8090,matrix.local=http://127.0.0.1:6167"
+                    "POCKETHOST_PROXY_ROUTES" to "web.local=http://127.0.0.1:8080,files.local=http://127.0.0.1:8090,matrix.local=http://127.0.0.1:6167,nextcloud.local=http://127.0.0.1:8081"
                 )
             }
         ),
@@ -71,7 +70,20 @@ object ServiceRegistry {
             description = "Rust/Go Matrix homeserver slot. Placeholder binary can be replaced later.",
             args = { context ->
                 listOf("--addr", "127.0.0.1:6167", "--data-dir", AppPaths.matrixRoot(context).absolutePath)
-            }
+            },
+            healthPath = "/_matrix/client/versions"
+        ),
+        ServiceSpec(
+            id = "nextcloud",
+            displayName = "Nextcloud Module",
+            binaryName = "nextcloudd",
+            defaultPort = 8081,
+            startByDefault = false,
+            description = "Isolated Linux-userland Nextcloud launcher slot. Not a native rewrite.",
+            args = { context ->
+                listOf("--addr", "127.0.0.1:8081", "--data-dir", AppPaths.nextcloudRoot(context).absolutePath)
+            },
+            healthPath = "/status.php"
         ),
         ServiceSpec(
             id = "cloudflared",
@@ -81,8 +93,12 @@ object ServiceRegistry {
             startByDefault = false,
             description = "Official cloudflared-compatible tunnel binary slot.",
             args = { context ->
-                val config = File(AppPaths.configDir(context), "cloudflared.yml")
+                val config = AppPaths.cloudflaredConfig(context)
                 listOf("tunnel", "--config", config.absolutePath, "run")
+            },
+            preflight = { context ->
+                val config = AppPaths.cloudflaredConfig(context)
+                if (config.exists()) null else "missing tunnel config: ${config.absolutePath}"
             }
         )
     )

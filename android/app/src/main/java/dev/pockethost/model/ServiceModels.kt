@@ -29,7 +29,9 @@ data class ServiceSpec(
     val startByDefault: Boolean,
     val description: String,
     val args: (Context) -> List<String>,
-    val env: (Context) -> Map<String, String> = { emptyMap() }
+    val env: (Context) -> Map<String, String> = { emptyMap() },
+    val healthPath: String = "/health",
+    val preflight: (Context) -> String? = { null }
 )
 
 data class LogLine(
