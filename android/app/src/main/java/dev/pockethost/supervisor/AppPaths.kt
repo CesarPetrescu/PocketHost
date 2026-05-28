@@ -11,7 +11,6 @@ object AppPaths {
     fun webRoot(context: Context): File = File(publicDir(context), "www")
     fun filesRoot(context: Context): File = File(publicDir(context), "files")
     fun matrixRoot(context: Context): File = File(dataDir(context), "matrix")
-    fun nextcloudRoot(context: Context): File = File(dataDir(context), "nextcloud")
     fun cloudflaredConfig(context: Context): File = File(configDir(context), "cloudflared.yml")
 
     fun ensure(context: Context) {
@@ -23,7 +22,6 @@ object AppPaths {
             webRoot(context),
             filesRoot(context),
             matrixRoot(context),
-            nextcloudRoot(context),
         ).forEach { it.mkdirs() }
     }
 }

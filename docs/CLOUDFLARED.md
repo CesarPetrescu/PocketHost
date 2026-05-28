@@ -30,7 +30,6 @@ The Android supervisor preflights that config path before launch. Missing config
 web.example.com       -> http://127.0.0.1:8080
 files.example.com     -> http://127.0.0.1:8090
 matrix.example.com    -> http://127.0.0.1:6167
-nextcloud.example.com -> http://127.0.0.1:8081
 ```
 
 Do not change default tunnel routing without a human gate. Do not commit credentials, tunnel tokens, generated certs, or dashboard screenshots that expose secrets.

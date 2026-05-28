@@ -47,7 +47,7 @@ object ServiceRegistry {
             args = { listOf("--addr", "127.0.0.1:8088") },
             env = {
                 mapOf(
-                    "POCKETHOST_PROXY_ROUTES" to "web.local=http://127.0.0.1:8080,files.local=http://127.0.0.1:8090,matrix.local=http://127.0.0.1:6167,nextcloud.local=http://127.0.0.1:8081"
+                    "POCKETHOST_PROXY_ROUTES" to "web.local=http://127.0.0.1:8080,files.local=http://127.0.0.1:8090,matrix.local=http://127.0.0.1:6167"
                 )
             }
         ),
@@ -72,18 +72,6 @@ object ServiceRegistry {
                 listOf("--addr", "127.0.0.1:6167", "--data-dir", AppPaths.matrixRoot(context).absolutePath)
             },
             healthPath = "/_matrix/client/versions"
-        ),
-        ServiceSpec(
-            id = "nextcloud",
-            displayName = "Nextcloud Module",
-            binaryName = "nextcloudd",
-            defaultPort = 8081,
-            startByDefault = false,
-            description = "Isolated Linux-userland Nextcloud launcher slot. Not a native rewrite.",
-            args = { context ->
-                listOf("--addr", "127.0.0.1:8081", "--data-dir", AppPaths.nextcloudRoot(context).absolutePath)
-            },
-            healthPath = "/status.php"
         ),
         ServiceSpec(
             id = "cloudflared",

@@ -186,7 +186,6 @@ private fun NetworkScreen(context: Context, statuses: Map<String, ServiceStatus>
                     Text("web.example.com -> http://127.0.0.1:8080")
                     Text("files.example.com -> http://127.0.0.1:8090")
                     Text("matrix.example.com -> http://127.0.0.1:6167")
-                    Text("nextcloud.example.com -> http://127.0.0.1:8081")
                     val binary = NativeBinaryLocator.fileFor(context, ServiceRegistry.byId("cloudflared")!!)
                     Text("Binary: ${if (binary.exists()) binary.absolutePath else "missing libcloudflared.so"}")
                     Text("Config: ${AppPaths.cloudflaredConfig(context).absolutePath}")
@@ -216,7 +215,6 @@ private fun StorageScreen(context: Context) {
                     DirRow("Web root", AppPaths.webRoot(context))
                     DirRow("File root", AppPaths.filesRoot(context))
                     DirRow("Matrix", AppPaths.matrixRoot(context))
-                    DirRow("Nextcloud", AppPaths.nextcloudRoot(context))
                 }
             }
         }

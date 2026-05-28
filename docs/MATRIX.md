@@ -2,7 +2,17 @@
 
 ## Recommendation
 
-Use Tuwunel first when an Android-compatible build is available. Use Conduit for lighter/beta experiments. Treat Dendrite as a gated Go fallback only, because its current upstream status and license need explicit review before bundling or redistribution.
+Use Conduit as the selected first Matrix candidate. Conduit is a lightweight Matrix homeserver written in Rust, and the current upstream repository records Apache-2.0 licensing. Treat other Conduit-family forks as separate database owners unless upstream explicitly documents a safe migration. Treat Dendrite as a gated Go fallback only, because its current upstream status and license need explicit review before bundling or redistribution.
+
+## Selected candidate
+
+```text
+Name: Conduit
+Source: https://gitlab.com/famedly/conduit
+License: Apache-2.0
+Bundling status: not bundled yet
+Android status: compatibility not verified yet
+```
 
 ## Contract expected by Android app
 

@@ -44,15 +44,13 @@
 
 ## 0.6 Matrix lab
 
-- select Tuwunel/Conduit/Dendrite candidate
-- Android-compatible build notes
+- Conduit Android-compatible build notes
 - first-run setup
 - admin user flow
 - backup/restore flow
 
 ## Later
 
-- Linux-userland lab for Nextcloud
 - device-owner/enterprise mode
 - fleet management
 - update channel and signed daemon bundles

@@ -39,17 +39,16 @@ Native daemons are packaged under `jniLibs/<abi>/` as `lib<name>.so` files and l
 | proxyd | on | 127.0.0.1:8088 | local service routing |
 | ddnsd | off | 127.0.0.1:8091 | usually unnecessary with tunnels |
 | matrixd | off | 127.0.0.1:6167 | heavier, selected by operator |
-| nextcloudd | off | 127.0.0.1:8081 | isolated Linux-userland launcher only |
 | cloudflared | off | outbound | requires user Cloudflare setup |
 
 ## Matrix decision
 
-Use a Rust Matrix homeserver first, with Go as fallback:
+Use Conduit as the selected Matrix candidate, with a replaceable adapter contract:
 
-1. Tuwunel as the preferred production-shaped candidate when an Android-compatible binary exists.
-2. Conduit for lighter/beta experiments.
+1. Conduit is the selected first candidate because it is a Rust Matrix homeserver with Apache-2.0 licensing.
+2. Tuwunel/conduwuit-style forks are not interchangeable against the same database unless upstream explicitly documents a safe migration.
 3. Dendrite only after human/legal review, because current upstream status and license markers make it a non-default option.
-4. Synapse is out of scope for native Android; it belongs in a Linux-userland module.
+4. Synapse is out of scope for native Android.
 
 The Android app must treat Matrix as a replaceable binary contract:
 
@@ -73,22 +72,19 @@ Recommended route model:
 web.example.com    -> http://127.0.0.1:8080
 files.example.com  -> http://127.0.0.1:8090
 matrix.example.com -> http://127.0.0.1:6167
-nextcloud.example.com -> http://127.0.0.1:8081
 ```
 
 Do not commit tunnel credentials. Store config in app-private storage and import it from the UI or debug tooling.
 
 ## Nextcloud decision
 
-Do not implement Nextcloud natively. Nextcloud requires a Linux-style PHP/web/database/background-job stack. For the core app, build MiniCloud instead:
+Do not implement Nextcloud in PocketHost core. Nextcloud requires a Linux-style PHP/web/database/background-job stack. Build MiniCloud instead:
 
 - upload/download/list/delete
 - SQLite metadata later
 - token auth
 - share links later
 - optional tunnel exposure
-
-A future `nextcloudd` module can supervise a Termux/proot/VM-style environment, but it must be isolated from the core app and store its runtime under `files/data/nextcloud`.
 
 ## Distribution modes
 
