@@ -5,8 +5,23 @@ This product includes source code and documentation licensed under the Apache Li
 
 Third-party components are not relicensed by this repository. When included, linked, or downloaded by users, they remain under their own licenses and notices.
 
+Bundled third-party binary:
+
+Component: cloudflared
+Version: 2026.5.2
+Source: https://github.com/cloudflare/cloudflared, tag 2026.5.2, commit 0e84636de9450d9e73c1e28932ed2bd62cb33e10
+License: Apache-2.0
+Build target:
+- android/arm64-v8a: android/app/src/main/jniLibs/arm64-v8a/libcloudflared.so
+- android/x86: android/app/src/main/jniLibs/x86/libcloudflared.so
+- android/x86_64: android/app/src/main/jniLibs/x86_64/libcloudflared.so
+SHA256:
+- arm64-v8a: 6a4b355fb8af5ab6603f2e18ee1c656315477a1c6dd7b89165e0810e8bfa9630
+- x86: 60be4cbe2299d8f9a060f0c99bfa611d537e43a4c5340278063267597d26f53d
+- x86_64: e77f2c2463262c23f2c238fd904838eeec4afa0cacb3afce8c5f8e387bda7494
+Modifications: no source modifications; cross-compiled from official source for Android with version/build-time linker metadata.
+
 Important non-vendored integrations:
-- cloudflared, the Cloudflare Tunnel client, is an optional separately built/bundled component. See Cloudflare's upstream repository and release notices before redistribution.
 - Tuwunel, Conduit, and Dendrite are optional Matrix homeserver implementations. PocketHost provides a supervisor slot and configuration contract, not a vendored Matrix implementation.
 - Nextcloud is not included. If an experimental Linux-userland module is added later, it must preserve Nextcloud and dependency license notices separately.
 

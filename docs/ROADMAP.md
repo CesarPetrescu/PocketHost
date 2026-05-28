@@ -28,9 +28,9 @@
 
 ## 0.4 Cloudflare module
 
+- bundled Android cloudflared source build with version/hash record
 - import tunnel config
 - route editor
-- cloudflared version/hash record
 - tunnel health card
 - public route verification runbook
 

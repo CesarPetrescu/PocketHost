@@ -35,7 +35,7 @@ Not automatically covered:
 - Cloudflare account credentials
 - user data
 - Matrix homeserver binaries downloaded from upstream; Dendrite currently requires extra legal review before bundling
-- cloudflared binaries downloaded from upstream
+- cloudflared binaries built from upstream source, which remain under upstream Apache-2.0 terms and must keep the `NOTICE` version/hash record
 - Nextcloud or Linux-userland packages
 - Android SDK/Gradle/Kotlin/Compose dependencies
 - future project trademarks/logos unless explicitly licensed

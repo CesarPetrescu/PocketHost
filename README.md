@@ -50,7 +50,7 @@ PocketHost/
   - `ddnsd`
 - Android ARM64 daemon packaging path
 - Matrix binary slot
-- Cloudflare Tunnel binary slot
+- bundled `cloudflared` binary slot for ARM64, x86, and x86_64 Android builds
 - local CI script, Go unit tests, Go formatting checks, and live daemon health/security verification
 - Flywheel process docs and release evidence rules
 - Android diagnostics bundle creation from Settings
@@ -59,7 +59,7 @@ PocketHost/
 ## What is intentionally not implemented yet
 
 - full Matrix homeserver source inside this repo
-- bundled `cloudflared` binary
+- Cloudflare tunnel credential import and public route verification
 - native Nextcloud
 - Google Play release pipeline
 - production update/signature system for daemon bundles
@@ -75,7 +75,7 @@ android/app/src/main/jniLibs/arm64-v8a/libddnsd.so
 android/app/src/main/jniLibs/arm64-v8a/libproxyd.so
 android/app/src/main/jniLibs/arm64-v8a/libhostd.so
 android/app/src/main/jniLibs/arm64-v8a/libmatrixd.so       optional
-android/app/src/main/jniLibs/arm64-v8a/libcloudflared.so   optional
+android/app/src/main/jniLibs/arm64-v8a/libcloudflared.so
 ```
 
 The `.so` suffix is an Android packaging mechanism. These files are normal executable daemons launched from `applicationInfo.nativeLibraryDir`.
@@ -109,6 +109,13 @@ Build Android Go daemons:
 ```
 
 The x86 and x86_64 emulator ABIs require Android NDK clang wrappers. Install the NDK under `$ANDROID_SDK_ROOT/ndk` or set `ANDROID_NDK_ROOT`.
+
+Build the bundled Android `cloudflared` artifacts from an official upstream checkout:
+
+```bash
+git clone --depth 1 --branch 2026.5.2 https://github.com/cloudflare/cloudflared.git /tmp/cloudflared-2026.5.2
+./scripts/build-cloudflared-android.sh /tmp/cloudflared-2026.5.2 all
+```
 
 Build the Android app from Android Studio by opening `android/`.
 
@@ -157,4 +164,4 @@ PocketHost code and docs are licensed under Apache-2.0. See `LICENSE`, `NOTICE`,
 
 ## Flywheel evidence
 
-The first five implementation turns are recorded in `docs/flywheel/TURNS_001_005.md`. Turns 006-015 are recorded in `docs/flywheel/TURNS_006_015.md`.
+The first five implementation turns are recorded in `docs/flywheel/TURNS_001_005.md`. Turns 006-015 are recorded in `docs/flywheel/TURNS_006_015.md`. Turns 016-020 and later are recorded under `docs/flywheel/`.
