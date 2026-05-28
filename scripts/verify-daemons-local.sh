@@ -96,6 +96,16 @@ if status != 200 or "PocketHost webd" not in body:
     raise SystemExit(f"proxy route failed: status={status} body={body[:160]}")
 print("ok proxyd host route web.local -> webd")
 
+status, body, _ = fetch("http://127.0.0.1:18088/")
+if status != 200 or "PocketHost proxy" not in body or "/go/web.local/" not in body:
+    raise SystemExit(f"proxy dashboard failed: status={status} body={body[:160]}")
+print("ok proxyd default dashboard")
+
+status, body, _ = fetch("http://127.0.0.1:18088/go/web.local/")
+if status != 200 or "PocketHost webd" not in body:
+    raise SystemExit(f"proxy dashboard route failed: status={status} body={body[:160]}")
+print("ok proxyd dashboard route web.local -> webd")
+
 status, body, _ = fetch_any("http://127.0.0.1:18081/dir/")
 if status != 403:
     raise SystemExit(f"webd directory listing should be blocked: status={status} body={body[:160]}")

@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"html"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -61,16 +62,80 @@ func newProxyHandler(addr string, started time.Time, routes map[string]string, l
 		return extra
 	}))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/go/") {
+			if proxyDashboardRoute(w, r, compiled, log) {
+				return
+			}
+		}
 		host := normalizeHost(strings.Split(r.Host, ":")[0])
 		route, ok := compiled[host]
 		if !ok {
-			pocket.WriteJSON(w, http.StatusNotFound, map[string]any{"error": "no route for host", "host": host})
+			proxyDashboard(w, compiled)
 			return
 		}
 		log.Printf("host=%s target=%s path=%s", host, route.Target, r.URL.Path)
 		route.Proxy.ServeHTTP(w, r)
 	})
 	return pocket.RequestLog(log, mux)
+}
+
+func proxyDashboard(w http.ResponseWriter, routes map[string]route) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = fmt.Fprint(w, `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PocketHost proxy</title>
+  <style>
+    body{font-family:system-ui,sans-serif;margin:2rem;max-width:760px;line-height:1.5;color:#1b1f24}
+    a{display:block;padding:.75rem 0;color:#075985;font-weight:700}
+    code{background:#eef2f7;border-radius:4px;padding:.1rem .3rem}
+  </style>
+</head>
+<body>
+  <h1>PocketHost proxy</h1>
+  <p>Choose a local service route.</p>
+`)
+	if len(routes) == 0 {
+		_, _ = fmt.Fprint(w, "  <p>No routes are configured.</p>\n")
+	} else {
+		_, _ = fmt.Fprint(w, "  <nav>\n")
+		for host, route := range routes {
+			_, _ = fmt.Fprintf(
+				w,
+				"    <a href=\"/go/%s/\">%s</a><div><code>%s</code></div>\n",
+				html.EscapeString(host),
+				html.EscapeString(host),
+				html.EscapeString(route.Target),
+			)
+		}
+		_, _ = fmt.Fprint(w, "  </nav>\n")
+	}
+	_, _ = fmt.Fprint(w, "</body>\n</html>\n")
+}
+
+func proxyDashboardRoute(w http.ResponseWriter, r *http.Request, routes map[string]route, log interface{ Printf(string, ...any) }) bool {
+	rest := strings.TrimPrefix(r.URL.Path, "/go/")
+	routeHost, suffix, _ := strings.Cut(rest, "/")
+	routeHost = normalizeHost(routeHost)
+	route, ok := routes[routeHost]
+	if !ok {
+		pocket.WriteError(w, http.StatusNotFound, "no dashboard route")
+		return true
+	}
+	if suffix == "" {
+		suffix = "/"
+	} else {
+		suffix = "/" + suffix
+	}
+	r.URL.Path = suffix
+	r.URL.RawPath = ""
+	r.Host = routeHost
+	log.Printf("dashboard_route host=%s target=%s path=%s", routeHost, route.Target, r.URL.Path)
+	route.Proxy.ServeHTTP(w, r)
+	return true
 }
 
 func newReverseProxy(targetURL *url.URL, log interface{ Printf(string, ...any) }) *httputil.ReverseProxy {
