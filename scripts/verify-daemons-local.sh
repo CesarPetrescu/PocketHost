@@ -33,9 +33,9 @@ fi
 echo "ok public bind guard rejects 0.0.0.0 by default"
 
 POCKETHOST_TOKEN="$TOKEN" "$TMP/bin/hostd" --addr 127.0.0.1:18099 >"$TMP/logs/hostd.log" 2>&1 & PIDS+=("$!")
-"$TMP/bin/webd" --addr 127.0.0.1:18080 --data-dir "$TMP/www" >"$TMP/logs/webd.log" 2>&1 & PIDS+=("$!")
+"$TMP/bin/webd" --addr 127.0.0.1:18081 --data-dir "$TMP/www" >"$TMP/logs/webd.log" 2>&1 & PIDS+=("$!")
 POCKETHOST_TOKEN="$TOKEN" "$TMP/bin/filed" --addr 127.0.0.1:18090 --data-dir "$TMP/files" >"$TMP/logs/filed.log" 2>&1 & PIDS+=("$!")
-"$TMP/bin/proxyd" --addr 127.0.0.1:18088 --routes "web.local=http://127.0.0.1:18080,files.local=http://127.0.0.1:18090" >"$TMP/logs/proxyd.log" 2>&1 & PIDS+=("$!")
+"$TMP/bin/proxyd" --addr 127.0.0.1:18088 --routes "web.local=http://127.0.0.1:18081,files.local=http://127.0.0.1:18090" >"$TMP/logs/proxyd.log" 2>&1 & PIDS+=("$!")
 POCKETHOST_TOKEN="$TOKEN" "$TMP/bin/ddnsd" --addr 127.0.0.1:18091 --interval 1h >"$TMP/logs/ddnsd.log" 2>&1 & PIDS+=("$!")
 
 POCKETHOST_VERIFY_TOKEN="$TOKEN" python3 - <<'PY'
@@ -49,7 +49,7 @@ import urllib.request
 TOKEN = os.environ["POCKETHOST_VERIFY_TOKEN"]
 checks = [
     ("hostd", "http://127.0.0.1:18099/health"),
-    ("webd", "http://127.0.0.1:18080/health"),
+    ("webd", "http://127.0.0.1:18081/health"),
     ("filed", "http://127.0.0.1:18090/health"),
     ("proxyd", "http://127.0.0.1:18088/health"),
     ("ddnsd", "http://127.0.0.1:18091/health"),
@@ -96,7 +96,7 @@ if status != 200 or "PocketHost webd" not in body:
     raise SystemExit(f"proxy route failed: status={status} body={body[:160]}")
 print("ok proxyd host route web.local -> webd")
 
-status, body, _ = fetch_any("http://127.0.0.1:18080/dir/")
+status, body, _ = fetch_any("http://127.0.0.1:18081/dir/")
 if status != 403:
     raise SystemExit(f"webd directory listing should be blocked: status={status} body={body[:160]}")
 print("ok webd directory listing disabled")
