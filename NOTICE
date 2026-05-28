@@ -1,0 +1,13 @@
+PocketHost
+Copyright 2026 PocketHost contributors
+
+This product includes source code and documentation licensed under the Apache License, Version 2.0.
+
+Third-party components are not relicensed by this repository. When included, linked, or downloaded by users, they remain under their own licenses and notices.
+
+Important non-vendored integrations:
+- cloudflared, the Cloudflare Tunnel client, is an optional separately built/bundled component. See Cloudflare's upstream repository and release notices before redistribution.
+- Tuwunel, Conduit, and Dendrite are optional Matrix homeserver implementations. PocketHost provides a supervisor slot and configuration contract, not a vendored Matrix implementation.
+- Nextcloud is not included. If an experimental Linux-userland module is added later, it must preserve Nextcloud and dependency license notices separately.
+
+The PocketHost name and any future project logos are not granted as trademarks by the Apache-2.0 license unless explicitly stated elsewhere.

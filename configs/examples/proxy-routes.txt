@@ -1,0 +1,3 @@
+# Format used by proxyd through POCKETHOST_PROXY_ROUTES:
+# host=url,host=url
+web.example.local=http://127.0.0.1:8080,files.example.local=http://127.0.0.1:8090,matrix.example.local=http://127.0.0.1:6167

@@ -1,0 +1,11 @@
+tunnel: REPLACE_WITH_TUNNEL_ID
+credentials-file: /data/data/dev.pockethost/files/config/cloudflared-credentials.json
+
+ingress:
+  - hostname: web.example.com
+    service: http://127.0.0.1:8080
+  - hostname: files.example.com
+    service: http://127.0.0.1:8090
+  - hostname: matrix.example.com
+    service: http://127.0.0.1:6167
+  - service: http_status:404
