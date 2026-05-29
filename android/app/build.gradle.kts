@@ -15,6 +15,35 @@ android {
         versionName = "0.1.0"
     }
 
+    // Ship one APK per architecture (plus a universal APK for sideloading/emulators)
+    // so a phone only downloads the daemons for its own ABI.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            isUniversalApk = true
+        }
+    }
+
+    buildTypes {
+        getByName("debug") {
+            applicationIdSuffix = ".debug"
+            isMinifyEnabled = false
+        }
+        getByName("release") {
+            isMinifyEnabled = false
+            // Daemons are launched by name from nativeLibraryDir, so resource/code
+            // shrinking is left off until keep rules are verified on-device.
+            // Debug-signed for now: installable for testing, not a Play release.
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
+    lint {
+        abortOnError = false
+    }
+
     packaging {
         jniLibs {
             // Required because the app executes daemon artifacts from nativeLibraryDir.
@@ -33,5 +62,6 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

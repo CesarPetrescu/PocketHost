@@ -1,7 +1,9 @@
 package main
 
 import (
+	"embed"
 	"flag"
+	"io/fs"
 	"net/http"
 	"os"
 	"runtime"
@@ -10,6 +12,9 @@ import (
 
 	"dev.pockethost/daemons/internal/pocket"
 )
+
+//go:embed web
+var webAssets embed.FS
 
 func main() {
 	var addr string
@@ -27,22 +32,52 @@ func main() {
 }
 
 func newHandler(addr string, started time.Time, token string) http.Handler {
+	return buildHandler(addr, started, token, defaultGateway(token))
+}
+
+// buildHandler wires the host control plane: an embedded web panel and a
+// loopback gateway over the sibling daemons. The panel and /health are public;
+// every /api/* route requires the admin token.
+func buildHandler(addr string, started time.Time, token string, gw *gateway) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", pocket.HealthHandler("hostd", addr, started, hostExtra))
-	mux.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			pocket.WriteJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
-			return
-		}
-		pocket.WriteJSON(w, http.StatusOK, map[string]any{
-			"runtime": hostExtra(),
-			"env": map[string]string{
-				"HOME":   os.Getenv("HOME"),
-				"TMPDIR": os.Getenv("TMPDIR"),
-			},
-		})
+	mux.Handle("/api/", pocket.RequireToken(apiMux(gw), token))
+	mux.Handle("/", staticHandler())
+	return mux
+}
+
+func apiMux(gw *gateway) http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/status", statusHandler)
+	mux.HandleFunc("/api/services", gw.servicesHandler)
+	mux.HandleFunc("/api/ddns/update-now", gw.ddnsUpdateHandler)
+	mux.HandleFunc("/api/files", gw.filesListHandler)
+	mux.HandleFunc("/api/files/download", gw.filesDownloadHandler)
+	mux.HandleFunc("/api/files/delete", gw.filesDeleteHandler)
+	mux.HandleFunc("/api/files/upload", gw.filesUploadHandler)
+	return mux
+}
+
+func staticHandler() http.Handler {
+	sub, err := fs.Sub(webAssets, "web")
+	if err != nil {
+		panic(err)
+	}
+	return http.FileServerFS(sub)
+}
+
+func statusHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		pocket.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	pocket.WriteJSON(w, http.StatusOK, map[string]any{
+		"runtime": hostExtra(),
+		"env": map[string]string{
+			"HOME":   os.Getenv("HOME"),
+			"TMPDIR": os.Getenv("TMPDIR"),
+		},
 	})
-	return pocket.RequireToken(mux, token)
 }
 
 func hostExtra() map[string]string {

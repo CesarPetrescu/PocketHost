@@ -128,4 +128,21 @@ status, body, _ = fetch("http://127.0.0.1:18099/api/status", {"Authorization": f
 if '"runtime"' not in body:
     raise SystemExit(f"hostd status missing runtime: status={status} body={body[:160]}")
 print("ok hostd status token gate")
+
+# Web control panel: static page is public, /api/services is token-gated.
+status, body, headers = fetch("http://127.0.0.1:18099/")
+if status != 200 or "PocketHost Control Panel" not in body:
+    raise SystemExit(f"hostd web panel not served: status={status} body={body[:160]}")
+if "text/html" not in headers.get("Content-Type", ""):
+    raise SystemExit(f"hostd web panel wrong content-type: {headers.get('Content-Type')}")
+print("ok hostd serves web control panel")
+
+status, body, _ = fetch_any("http://127.0.0.1:18099/api/services")
+if status != 401:
+    raise SystemExit(f"hostd services should require token: status={status} body={body[:160]}")
+status, body, _ = fetch("http://127.0.0.1:18099/api/services", {"X-PocketHost-Token": TOKEN})
+data = json.loads(body)
+if "services" not in data or not isinstance(data["services"], list) or not data["services"]:
+    raise SystemExit(f"hostd services aggregation malformed: status={status} body={body[:160]}")
+print(f"ok hostd /api/services aggregates {len(data['services'])} daemons")
 PY

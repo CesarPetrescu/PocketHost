@@ -32,6 +32,7 @@ class ServerForegroundService : Service() {
             ACTION_START_ONE -> intent?.getStringExtra(EXTRA_SERVICE_ID)?.let { ProcessSupervisor.start(this, it) }
             ACTION_STOP_ONE -> intent?.getStringExtra(EXTRA_SERVICE_ID)?.let { ProcessSupervisor.stop(this, it) }
             ACTION_RESTART_ONE -> intent?.getStringExtra(EXTRA_SERVICE_ID)?.let { ProcessSupervisor.restart(this, it) }
+            ACTION_RESTART_ALL -> ProcessSupervisor.restartAll(this)
         }
         return START_STICKY
     }
@@ -89,6 +90,7 @@ class ServerForegroundService : Service() {
         const val ACTION_START_ONE = "dev.pockethost.action.START_ONE"
         const val ACTION_STOP_ONE = "dev.pockethost.action.STOP_ONE"
         const val ACTION_RESTART_ONE = "dev.pockethost.action.RESTART_ONE"
+        const val ACTION_RESTART_ALL = "dev.pockethost.action.RESTART_ALL"
         const val EXTRA_SERVICE_ID = "service_id"
     }
 }

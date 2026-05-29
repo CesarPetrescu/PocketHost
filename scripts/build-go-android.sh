@@ -52,9 +52,11 @@ cmds=(hostd webd filed ddnsd proxyd)
 build_one() {
   local abi="$1"
   local goarch goarm cc_target
+  # android/arm (32-bit) requires external cgo linking, so armeabi-v7a must be
+  # built with the NDK clang just like the x86 targets. arm64 links statically.
   case "$abi" in
     arm64-v8a) goarch="arm64"; goarm=""; cc_target="" ;;
-    armeabi-v7a) goarch="arm"; goarm="7"; cc_target="" ;;
+    armeabi-v7a) goarch="arm"; goarm="7"; cc_target="armv7a-linux-androideabi" ;;
     x86) goarch="386"; goarm=""; cc_target="i686-linux-android" ;;
     x86_64) goarch="amd64"; goarm=""; cc_target="x86_64-linux-android" ;;
     *) echo "Unsupported ABI: $abi" >&2; exit 2 ;;
@@ -66,9 +68,7 @@ build_one() {
     if [[ -n "$cc_target" ]]; then
       local cc
       cc="$(ndk_clang "$cc_target")"
-      (cd "$GO_DIR" && CC="$cc" CGO_ENABLED=1 GOOS=android GOARCH="$goarch" go build -trimpath -ldflags="-s -w" -o "$JNI_DIR/$abi/lib${cmd}.so" "./cmd/$cmd")
-    elif [[ -n "$goarm" ]]; then
-      (cd "$GO_DIR" && CGO_ENABLED=0 GOOS=android GOARCH="$goarch" GOARM="$goarm" go build -trimpath -ldflags="-s -w" -o "$JNI_DIR/$abi/lib${cmd}.so" "./cmd/$cmd")
+      (cd "$GO_DIR" && env CC="$cc" CGO_ENABLED=1 GOOS=android GOARCH="$goarch" ${goarm:+GOARM="$goarm"} go build -trimpath -ldflags="-s -w" -o "$JNI_DIR/$abi/lib${cmd}.so" "./cmd/$cmd")
     else
       (cd "$GO_DIR" && CGO_ENABLED=0 GOOS=android GOARCH="$goarch" go build -trimpath -ldflags="-s -w" -o "$JNI_DIR/$abi/lib${cmd}.so" "./cmd/$cmd")
     fi

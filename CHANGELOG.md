@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `hostd` now serves a loopback **web control panel** (embedded SPA, no build step): one-glance live status of every daemon, per-service detail, and per-daemon controls (DDNS update-now; filed browse/upload/download/delete). The browser holds the admin token in `sessionStorage`; `hostd` re-authenticates outbound to siblings so the token never leaves loopback.
+- `hostd` gateway endpoints: `/api/services` (concurrent `/health` aggregation), `/api/ddns/update-now`, and `/api/files{,/download,/upload,/delete}` proxies, with path-traversal rejection at the gateway and unit tests for aggregation, token forwarding, gating, and path safety.
+- Explicit operator **network exposure toggle** (Settings → "Expose services on the local network"): binds daemons to `0.0.0.0` instead of `127.0.0.1`, off by default, wired through `ServiceRegistry` (`--addr` + `POCKETHOST_ALLOW_PUBLIC_BIND=true`) with a warned UI and a "Restart running services to apply" action.
+- Redesigned in-app Compose manager: Material 3 dark/light theme, semantic status chips/colors, navigation icons, per-service uptime, state-aware Start/Stop/Restart, and a launcher for the web panel.
+
+- Multi-architecture build path: Gradle wrapper, per-ABI APK splits + a universal APK, and a debug-signed `release` build type. Daemons rebuilt for `arm64-v8a`, `armeabi-v7a`, `x86`, and `x86_64`.
+- Loopback-only network security config so in-app `/health` probes (and the web panel) work without weakening cleartext policy for any other host.
+- Emulator smoke evidence and screenshots under `docs/screenshots/`.
+
+### Changed
+
+- `ServiceRegistry` builds each daemon's listen address from the bind-host preference; `ProcessSupervisor` gains `restartAll`.
+- Live daemon verification (`scripts/verify-daemons-local.sh`) now checks the web panel page and the token-gated `/api/services` aggregation.
+
+### Fixed
+
+- `build-go-android.sh` now builds `armeabi-v7a` correctly (android/arm requires cgo/NDK linking; it was previously built with cgo disabled and failed).
+- In-app health probes no longer fail (and pin services to "Degraded") under Android's default cleartext-traffic block.
+
 ## 0.1.2 - Flywheel turns 006-015
 
 ### Added

@@ -45,6 +45,18 @@ object ProcessSupervisor {
         start(context, id)
     }
 
+    /** Restart every service that is currently active, e.g. to apply a new bind host. */
+    fun restartAll(context: Context) {
+        AppPaths.ensure(context)
+        LogBus.attach(context.applicationContext)
+        ServiceRegistry.specs.forEach { spec ->
+            val state = _statuses.value[spec.id]?.state
+            if (state == ServiceState.Running || state == ServiceState.Degraded || state == ServiceState.Starting) {
+                restart(context, spec.id)
+            }
+        }
+    }
+
     fun start(context: Context, id: String) {
         val appContext = context.applicationContext
         val spec = ServiceRegistry.byId(id) ?: return

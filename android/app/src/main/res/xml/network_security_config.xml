@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  PocketHost talks to its own daemons over loopback HTTP (health probes, the
+  Host API, the web control panel). Android blocks cleartext by default, which
+  would make every local /health probe fail and pin services to "Degraded".
+  Cleartext is permitted ONLY for loopback; every other destination stays
+  cleartext-blocked, so this does not weaken the network posture.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">::1</domain>
+    </domain-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

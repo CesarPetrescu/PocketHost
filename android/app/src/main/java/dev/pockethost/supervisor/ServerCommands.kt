@@ -7,6 +7,7 @@ import android.os.Build
 object ServerCommands {
     fun startAll(context: Context) = send(context, ServerForegroundService.ACTION_START_ALL)
     fun stopAll(context: Context) = send(context, ServerForegroundService.ACTION_STOP_ALL)
+    fun restartAll(context: Context) = send(context, ServerForegroundService.ACTION_RESTART_ALL)
     fun start(context: Context, serviceId: String) =
         send(context, ServerForegroundService.ACTION_START_ONE, serviceId)
     fun stop(context: Context, serviceId: String) =

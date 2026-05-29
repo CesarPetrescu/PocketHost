@@ -20,9 +20,12 @@
 
 ## 0.3 Android validation
 
-- Gradle wrapper
-- Android instrumented smoke tests
-- APK build in CI
+- Gradle wrapper ✅
+- multi-ABI APK splits (arm64-v8a, armeabi-v7a, x86, x86_64) + universal ✅
+- debug-signed release build type ✅
+- emulator smoke evidence (install, start daemon, /health, screenshots) ✅
+- Android instrumented smoke tests (automated, in CI) — pending
+- APK build in CI — pending
 - real-device runbook
 - battery/thermal observation notes
 

@@ -36,7 +36,9 @@ PocketHost/
 
 ## What is implemented
 
-- Compose dashboard/services/network/storage/logs/settings UI
+- Compose dashboard/services/network/storage/logs/settings UI with Material 3 theming, status chips, and per-service uptime
+- `hostd` web control panel: aggregated live daemon status plus per-daemon controls (DDNS refresh, file browse/upload/download/delete), token-gated over loopback
+- operator network-exposure toggle (loopback `127.0.0.1` ⇄ `0.0.0.0`), off by default and wired through the daemon bind guard
 - foreground service supervisor
 - boot receiver
 - SQLite log persistence

@@ -27,6 +27,22 @@ local daemon /health
           -> Compose Dashboard/Services degraded-state display
 ```
 
+## Web control panel flow
+
+```text
+Browser (loopback or LAN, same device or network)
+  -> hostd static SPA            (public page; admin token kept in sessionStorage)
+      -> hostd /api/* with X-PocketHost-Token
+          -> RequireToken gate
+              -> aggregate: concurrent GET /health of every daemon
+              -> action: re-authenticated proxy to ddnsd/filed with server-side token
+                  -> sibling daemon's own validation (SafeExistingPath, byte caps, etc.)
+```
+
+The token never leaves loopback: the browser sends it to hostd, hostd attaches
+its own copy to outbound sibling calls. Daemon start/stop is not reachable from
+the panel; that path stays exclusively with the Android supervisor.
+
 ## File API flow
 
 ```text

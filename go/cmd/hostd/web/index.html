@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark light" />
+  <title>PocketHost Control Panel</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">◆</span>
+      <div>
+        <h1>PocketHost</h1>
+        <p class="tagline">Android mini-server control plane</p>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span id="clock" class="clock"></span>
+      <span id="conn" class="pill pill-muted">connecting…</span>
+      <button id="lock-btn" class="btn btn-ghost" hidden>Lock</button>
+    </div>
+  </header>
+
+  <main id="app">
+    <!-- Token gate -->
+    <section id="gate" class="gate" hidden>
+      <div class="card gate-card">
+        <h2>Unlock control panel</h2>
+        <p class="muted">
+          Paste the <strong>admin token</strong> shown in the PocketHost app under
+          <em>Settings → Admin token</em>. It is stored only in this browser tab and
+          sent over loopback to <code id="origin-host"></code>.
+        </p>
+        <form id="token-form" autocomplete="off">
+          <input id="token-input" type="password" placeholder="admin token" spellcheck="false" />
+          <button class="btn btn-primary" type="submit">Unlock</button>
+        </form>
+        <p id="gate-error" class="error" hidden></p>
+      </div>
+    </section>
+
+    <!-- Dashboard -->
+    <section id="dashboard" hidden>
+      <div id="exposure-banner" class="banner" hidden></div>
+
+      <div class="summary">
+        <div class="stat"><span class="stat-num" id="stat-up">–</span><span class="stat-label">running</span></div>
+        <div class="stat"><span class="stat-num" id="stat-down">–</span><span class="stat-label">attention</span></div>
+        <div class="stat"><span class="stat-num" id="stat-total">–</span><span class="stat-label">services</span></div>
+        <div class="summary-actions">
+          <label class="auto"><input type="checkbox" id="auto-refresh" checked /> auto-refresh</label>
+          <button id="refresh-btn" class="btn btn-ghost">Refresh</button>
+        </div>
+      </div>
+
+      <p class="note">
+        Start/stop is controlled by the Android supervisor app — for safety, daemons are
+        only launched there. This panel monitors the fleet and drives each daemon's own actions.
+      </p>
+
+      <div id="grid" class="grid"></div>
+    </section>
+  </main>
+
+  <!-- Detail drawer -->
+  <div id="drawer" class="drawer" hidden>
+    <div class="drawer-backdrop" data-close></div>
+    <aside class="drawer-panel" role="dialog" aria-modal="true">
+      <div class="drawer-head">
+        <h2 id="drawer-title">Service</h2>
+        <button class="btn btn-ghost" data-close>✕</button>
+      </div>
+      <div id="drawer-body" class="drawer-body"></div>
+    </aside>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

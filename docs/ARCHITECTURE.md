@@ -64,6 +64,52 @@ Default local-only bindings:
 
 Use Cloudflare Tunnel or another private tunnel for public routing.
 
+## Network exposure toggle
+
+By default every daemon binds `127.0.0.1` (architecture rules 1 & 2). The Android
+app exposes a single, explicit, off-by-default operator toggle in
+**Settings → Expose services on the local network**:
+
+```text
+ServicePreferences.exposeOnLan = false  -> bind host 127.0.0.1   (loopback only)
+ServicePreferences.exposeOnLan = true   -> bind host 0.0.0.0     (LAN/WAN reachable)
+```
+
+`ServiceRegistry` threads the chosen bind host into each daemon's `--addr` and,
+when LAN exposure is on, sets `POCKETHOST_ALLOW_PUBLIC_BIND=true` so
+`pocket.ValidateListenAddr` permits the non-loopback bind. The guard is never
+weakened: a non-loopback bind without that explicit override is still refused.
+Changing the toggle requires restarting daemons; the app offers a
+**Restart running services to apply** action (`ACTION_RESTART_ALL`). The web
+panel and the in-app dashboard both surface a banner whenever any daemon is
+bound to `0.0.0.0`. Public internet routing should still prefer Cloudflare
+Tunnel over a raw open port.
+
+## Host web control panel
+
+`hostd` serves a loopback web control panel in addition to its status API:
+
+```text
+GET  /                     embedded single-page panel (public; asks for token)
+GET  /health               public
+GET  /api/status           token-gated runtime info
+GET  /api/services         token-gated; concurrent /health aggregation of the fleet
+POST /api/ddns/update-now  token-gated; proxied to ddnsd
+GET  /api/files            token-gated; proxied directory listing from filed
+GET  /api/files/download   token-gated; proxied file download from filed
+POST /api/files/upload     token-gated; proxied multipart upload to filed
+POST /api/files/delete     token-gated; proxied delete to filed
+```
+
+The panel is a static SPA (no build step). The browser holds the admin token in
+`sessionStorage` and sends it as `X-PocketHost-Token`; `hostd` validates it and,
+for control actions, re-authenticates outbound to sibling daemons with the same
+token held server-side, so the token reaches only loopback. Process start/stop
+is deliberately **not** exposed here — only the Android foreground supervisor may
+launch or kill daemons (rule 3). The panel follows the same bind host as every
+other daemon, so enabling LAN exposure makes it reachable from the network too;
+its `/api/*` routes stay token-gated.
+
 ## Matrix integration
 
 The app already has a Matrix service slot. Replace the placeholder with one of:
