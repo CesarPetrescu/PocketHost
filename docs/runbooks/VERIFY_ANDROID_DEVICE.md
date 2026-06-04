@@ -11,6 +11,19 @@ Use this runbook before calling an Android change done.
 
 ## Steps
 
+### Build and stage split APKs
+
+From the repository root:
+
+```bash
+./scripts/package-android.sh release
+```
+
+Use the APK in `releases/apk/` matching the device ABI, or use the universal APK
+for broad sideload compatibility. These are debug-signed developer artifacts.
+
+### Device smoke test
+
 1. Open PocketHost.
 2. Tap **Start all**.
 3. Confirm persistent notification appears.

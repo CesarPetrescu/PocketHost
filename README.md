@@ -4,6 +4,13 @@ PocketHost is an Android mini-server control plane for repurposed phones and tab
 
 It runs an Android-native supervisor app and launches small native daemons for web, files, DDNS, proxying, host status, Matrix, and Cloudflare Tunnel integration.
 
+
+## Current project status
+
+PocketHost is an early, developer-sideload MVP. The repository contains a working Android control-plane shell, a foreground supervisor, Go daemon sources with local health/security tests, prebuilt daemon artifacts in `jniLibs/` for the configured Android ABIs, a Rust Matrix placeholder, and a Cloudflare Tunnel binary slot. It is **not** release-ready for public distribution: release signing, automated Android device validation, Cloudflare credential import, public tunnel verification, Matrix homeserver replacement, and Google Play policy work remain pending.
+
+Use `./scripts/ci-local.sh` for the local Go/test verification baseline and `./scripts/package-android.sh release` to create local split APKs under `releases/apk/`. The generated release variant is currently debug-signed for sideload testing only.
+
 ## Final stack
 
 | Layer | Choice |
@@ -50,8 +57,8 @@ PocketHost/
   - `filed`
   - `proxyd`
   - `ddnsd`
-- Android ARM64 daemon packaging path
-- Matrix binary slot
+- Android daemon packaging paths for `arm64-v8a`, `armeabi-v7a`, `x86`, and `x86_64`
+- Matrix binary slot with a Rust placeholder implementation
 - bundled `cloudflared` binary slot for ARM64, x86, and x86_64 Android builds
 - local CI script, Go unit tests, Go formatting checks, and live daemon health/security verification
 - Flywheel process docs and release evidence rules
@@ -103,14 +110,20 @@ cd go
 go test ./...
 ```
 
-Build Android Go daemons:
+Build Android Go daemons for every configured APK split:
+
+```bash
+./scripts/build-go-android.sh all
+```
+
+You can also build selected ABIs, for example:
 
 ```bash
 ./scripts/build-go-android.sh arm64-v8a
 ./scripts/build-go-android.sh x86_64 x86
 ```
 
-The x86 and x86_64 emulator ABIs require Android NDK clang wrappers. Install the NDK under `$ANDROID_SDK_ROOT/ndk` or set `ANDROID_NDK_ROOT`.
+The `armeabi-v7a`, `x86`, and `x86_64` ABIs require Android NDK clang wrappers. Install the NDK under `$ANDROID_SDK_ROOT/ndk` or set `ANDROID_NDK_ROOT`.
 
 Build the bundled Android `cloudflared` artifacts from an official upstream checkout:
 
@@ -119,9 +132,13 @@ git clone --depth 1 --branch 2026.5.2 https://github.com/cloudflare/cloudflared.
 ./scripts/build-cloudflared-android.sh /tmp/cloudflared-2026.5.2 all
 ```
 
-Build the Android app from Android Studio by opening `android/`.
+Build the Android app from Android Studio by opening `android/`, or from the repository root with the wrapper-backed packaging script:
 
-A Gradle wrapper is not included in this generated package. Add it before treating the repository as release-ready CI infrastructure.
+```bash
+./scripts/package-android.sh release
+```
+
+The packaging script runs Gradle and copies split APKs for `arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`, and `universal` into `releases/apk/`. The current release build type is debug-signed for sideload testing; it is not a public release-signing pipeline.
 
 ## First Android smoke test
 
