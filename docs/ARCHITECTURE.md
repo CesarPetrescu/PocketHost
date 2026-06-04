@@ -145,3 +145,17 @@ Store tunnel config under:
 ```
 
 Do not hard-code Cloudflare credentials into the APK.
+
+## APK outputs and local staging
+
+The Android Gradle configuration enables ABI splits for `arm64-v8a`,
+`armeabi-v7a`, `x86`, and `x86_64`, plus a universal APK. Run:
+
+```bash
+./scripts/package-android.sh release
+```
+
+The script assembles the selected variant and stages APK files in
+`releases/apk/`. The current release build type uses the debug signing config so
+operators can sideload and smoke-test builds; it is not a production signing or
+Google Play release workflow.

@@ -6,3 +6,4 @@ local.properties
 android/.gradle/
 android/app/build/
 rust/matrixd/target/
+releases/apk/*.apk

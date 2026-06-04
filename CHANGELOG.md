@@ -4,6 +4,9 @@
 
 ### Added
 
+- project status document describing implemented MVP pieces, release gaps, and verification baseline
+- local APK staging directory documentation under `releases/`
+
 - `hostd` now serves a loopback **web control panel** (embedded SPA, no build step): one-glance live status of every daemon, per-service detail, and per-daemon controls (DDNS update-now; filed browse/upload/download/delete). The browser holds the admin token in `sessionStorage`; `hostd` re-authenticates outbound to siblings so the token never leaves loopback.
 - `hostd` gateway endpoints: `/api/services` (concurrent `/health` aggregation), `/api/ddns/update-now`, and `/api/files{,/download,/upload,/delete}` proxies, with path-traversal rejection at the gateway and unit tests for aggregation, token forwarding, gating, and path safety.
 - Explicit operator **network exposure toggle** (Settings → "Expose services on the local network"): binds daemons to `0.0.0.0` instead of `127.0.0.1`, off by default, wired through `ServiceRegistry` (`--addr` + `POCKETHOST_ALLOW_PUBLIC_BIND=true`) with a warned UI and a "Restart running services to apply" action.
@@ -14,6 +17,9 @@
 - Emulator smoke evidence and screenshots under `docs/screenshots/`.
 
 ### Changed
+
+- Android packaging docs now describe the Gradle wrapper, all ABI split outputs, and the debug-signed local release workflow
+- packaging script now supports `debug` or `release` variants and copies generated split APKs into `releases/apk/`
 
 - `ServiceRegistry` builds each daemon's listen address from the bind-host preference; `ProcessSupervisor` gains `restartAll`.
 - Live daemon verification (`scripts/verify-daemons-local.sh`) now checks the web panel page and the token-gated `/api/services` aggregation.
