@@ -18,6 +18,14 @@ ANDROID_NDK_ROOT="${ANDROID_NDK_ROOT:-}"
 CLOUDFLARED_VERSION="${CLOUDFLARED_VERSION:-2026.5.2}"
 CLOUDFLARED_BUILD_TIME="${CLOUDFLARED_BUILD_TIME:-2026-05-28T00:00 UTC}"
 
+host_tag() {
+  case "$(uname -s 2>/dev/null || echo unknown)" in
+    MINGW*|MSYS*|CYGWIN*) echo "windows-x86_64" ;;
+    Darwin*) echo "darwin-x86_64" ;;
+    *) echo "linux-x86_64" ;;
+  esac
+}
+
 if [[ $# -lt 1 ]]; then
   echo "Usage: $0 /path/to/cloudflared-source [abi ...]" >&2
   exit 2
@@ -32,7 +40,9 @@ if [[ ! -f "$SOURCE_DIR/go.mod" || ! -d "$SOURCE_DIR/cmd/cloudflared" ]]; then
 fi
 
 find_ndk_root() {
-  if [[ -n "$ANDROID_NDK_ROOT" && -d "$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin" ]]; then
+  local host
+  host="$(host_tag)"
+  if [[ -n "$ANDROID_NDK_ROOT" && -d "$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/$host/bin" ]]; then
     echo "$ANDROID_NDK_ROOT"
     return
   fi
@@ -49,7 +59,11 @@ ndk_clang() {
     echo "Android NDK not found. Set ANDROID_NDK_ROOT or install NDK under $ANDROID_SDK_ROOT/ndk." >&2
     exit 2
   fi
-  local cc="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/${target}${ANDROID_API}-clang"
+  local host ext cc
+  host="$(host_tag)"
+  ext=""
+  [[ "$host" == windows-* ]] && ext=".cmd"
+  cc="$ndk/toolchains/llvm/prebuilt/$host/bin/${target}${ANDROID_API}-clang$ext"
   if [[ ! -x "$cc" ]]; then
     echo "Android NDK clang not found: $cc" >&2
     exit 2

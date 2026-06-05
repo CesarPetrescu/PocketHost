@@ -50,6 +50,16 @@ android {
             useLegacyPackaging = true
         }
     }
+
+    sourceSets {
+        getByName("main") {
+            assets.srcDirs(
+                "src/main/assets",
+                "D:/PocketHostDeps/nextcloud-v32.0.11/assets",
+                "D:/PocketHostDeps/php-android/assets"
+            )
+        }
+    }
 }
 
 dependencies {
