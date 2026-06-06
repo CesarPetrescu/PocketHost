@@ -511,7 +511,7 @@ private fun MatrixScreen(context: Context, statuses: Map<String, ServiceStatus>)
             )
         )
         return runCatching {
-            val file = ServicePreferences.writeTuwunelConfig(context)
+            val file = ServicePreferences.writeDendriteConfig(context)
             message = "Wrote ${file.absolutePath}"
             true
         }.getOrElse {
@@ -524,7 +524,7 @@ private fun MatrixScreen(context: Context, statuses: Map<String, ServiceStatus>)
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item { Header("Matrix", "Tuwunel homeserver setup") }
+        item { Header("Matrix", "Dendrite homeserver setup") }
         item {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -578,7 +578,7 @@ private fun MatrixScreen(context: Context, statuses: Map<String, ServiceStatus>)
                         )
                     }
                     Button(onClick = { saveMatrixConfig() }, modifier = Modifier.fillMaxWidth()) {
-                        Text("Save tuwunel.toml")
+                        Text("Save dendrite.yaml")
                     }
                 }
             }

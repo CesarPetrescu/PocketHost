@@ -69,9 +69,19 @@ object ServiceRegistry {
             binaryName = "matrixd",
             defaultPort = 6167,
             startByDefault = false,
-            description = "Tuwunel Matrix homeserver slot. Experimental until Android runtime is verified.",
+            description = "Dendrite Matrix homeserver (Go). Experimental until Android runtime is verified.",
             args = { context ->
-                listOf("--config", ServicePreferences.writeTuwunelConfig(context).absolutePath)
+                val cfg = ServicePreferences.writeDendriteConfig(context)
+                val base = listOf(
+                    "-config", cfg.absolutePath,
+                    "-http-bind-address", listenAddr(context, 6167)
+                )
+                // Dendrite refuses open registration without an explicit acknowledgement flag.
+                if (ServicePreferences.matrixSettings(context).registrationEnabled) {
+                    base + "-really-enable-open-registration"
+                } else {
+                    base
+                }
             },
             preflight = { context -> ServicePreferences.matrixPreflight(context) },
             env = { context -> bindEnv(context) },

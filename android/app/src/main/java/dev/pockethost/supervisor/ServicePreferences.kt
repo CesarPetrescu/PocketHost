@@ -1,6 +1,8 @@
 package dev.pockethost.supervisor
 
 import android.content.Context
+import android.util.Base64
+import dev.pockethost.R
 import java.security.SecureRandom
 
 object ServicePreferences {
@@ -206,32 +208,65 @@ object ServicePreferences {
             .apply()
     }
 
-    fun writeTuwunelConfig(context: Context): java.io.File {
+    /**
+     * Render the bundled Dendrite (Matrix homeserver) config template into the app-private
+     * config dir, substituting the operator's server name, the matrix data dir, and the
+     * registration gate. Also ensures a signing key exists. Returns the written YAML file.
+     */
+    fun writeDendriteConfig(context: Context): java.io.File {
         AppPaths.ensure(context)
         val settings = matrixSettings(context)
         require(settings.serverName.trim().isNotBlank()) { "Matrix server name is required." }
         if (settings.registrationEnabled) {
             require(settings.registrationToken.trim().isNotBlank()) { "Registration token is required when registration is enabled." }
         }
-        val config = buildString {
-            appendLine("[global]")
-            appendLine("server_name = ${tomlString(settings.serverName)}")
-            appendLine("database_path = ${tomlString(AppPaths.matrixRoot(context).absolutePath)}")
-            appendLine("address = [${tomlString(LOOPBACK_HOST)}]")
-            appendLine("port = [6167]")
-            appendLine("allow_registration = ${settings.registrationEnabled}")
-            if (settings.registrationEnabled) appendLine("registration_token = ${tomlString(settings.registrationToken)}")
-            appendLine("allow_federation = ${settings.federationEnabled}")
-            appendLine("log = \"warn,tuwunel=info\"")
-        }
+        ensureMatrixSigningKey(context)
+        val matrixDir = AppPaths.matrixRoot(context).absolutePath
+        val sharedSecret = settings.registrationToken.trim().ifBlank { "disabled" }
+        val template = context.resources.openRawResource(R.raw.dendrite_template)
+            .bufferedReader().use { it.readText() }
+        val config = template
+            .replace("__PH_SERVER_NAME__", settings.serverName.trim())
+            .replace("__PH_MATRIX_DIR__", matrixDir)
+            .replace("__PH_REG_DISABLED__", (!settings.registrationEnabled).toString())
+            .replace("__PH_REG_SECRET__", dendriteScalar(sharedSecret))
         return AppPaths.matrixConfig(context).apply { writeText(config) }
     }
+
+    /**
+     * A Matrix server signing key is just a base64-encoded 32-byte ed25519 seed wrapped in a
+     * "MATRIX PRIVATE KEY" PEM block; Dendrite derives the keypair from the seed at startup.
+     * Generate one with SecureRandom (no external crypto provider needed on minSdk 26) and
+     * persist it so the homeserver identity stays stable across restarts.
+     */
+    fun ensureMatrixSigningKey(context: Context): java.io.File {
+        val keyFile = AppPaths.matrixSigningKey(context)
+        if (keyFile.exists() && keyFile.length() > 0) return keyFile
+        keyFile.parentFile?.mkdirs()
+        val rnd = SecureRandom()
+        val seed = ByteArray(32).also { rnd.nextBytes(it) }
+        val b64 = Base64.encodeToString(seed, Base64.NO_WRAP)
+        val alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        val keyId = buildString { repeat(6) { append(alphabet[rnd.nextInt(alphabet.length)]) } }
+        keyFile.writeText(
+            "-----BEGIN MATRIX PRIVATE KEY-----\n" +
+                "Key-ID: ed25519:$keyId\n\n" +
+                "$b64\n" +
+                "-----END MATRIX PRIVATE KEY-----\n"
+        )
+        return keyFile
+    }
+
+    /** Emit a bare YAML scalar when safe, otherwise a double-quoted one. */
+    private fun dendriteScalar(value: String): String =
+        if (value.isNotEmpty() && value.all { it.isLetterOrDigit() || it == '_' || it == '-' }) value
+        else "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
     fun matrixPreflight(context: Context): String? {
         val settings = matrixSettings(context)
         if (!settings.configured) return "Matrix is not configured. Set a server name first."
         return runCatching {
-            writeTuwunelConfig(context)
+            writeDendriteConfig(context)
             null
         }.getOrElse { it.message ?: it.javaClass.simpleName }
     }

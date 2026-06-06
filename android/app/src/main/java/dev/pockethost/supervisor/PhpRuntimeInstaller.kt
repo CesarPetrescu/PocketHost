@@ -152,7 +152,15 @@ object PhpRuntimeInstaller {
                 appendLine("upload_tmp_dir=${tempDir.absolutePath}")
                 appendLine("extension_dir=${extensionsDir.absolutePath}")
                 appendLine("date.timezone=UTC")
-                appendLine("opcache.enable_cli=1")
+                // 17 of the 19 required extensions are compiled into libphp.so; gd and
+                // sodium ship as shared modules in extensions/ and must be loaded explicitly.
+                appendLine("extension=gd")
+                appendLine("extension=sodium")
+                // The Termux PHP build's opcache hardcodes a temp path
+                // (/data/data/com.termux/.../tmp) that does not exist in this app's
+                // sandbox and crashes the php -S worker. Nextcloud runs fine without it.
+                appendLine("opcache.enable=0")
+                appendLine("opcache.enable_cli=0")
             }
         )
     }

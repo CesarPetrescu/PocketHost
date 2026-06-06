@@ -5,8 +5,8 @@ import java.io.File
 import java.util.zip.ZipInputStream
 
 object NextcloudInstaller {
-    const val VERSION = "32.0.11"
-    private const val ASSET_NAME = "nextcloud-server-32.0.11.zip"
+    const val VERSION = "33.0.5"
+    private const val ASSET_NAME = "nextcloud-server-33.0.5.zip"
 
     fun installFromAssets(context: Context): File {
         AppPaths.ensure(context)

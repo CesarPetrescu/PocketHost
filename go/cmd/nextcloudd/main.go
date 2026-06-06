@@ -81,16 +81,16 @@ func main() {
 			return
 		}
 		pocket.WriteJSON(w, http.StatusOK, map[string]any{
-			"service":        "nextcloudd",
-			"status":         "ok",
-			"addr":           addr,
-			"php_addr":       phpAddr,
+			"service":         "nextcloudd",
+			"status":          "ok",
+			"addr":            addr,
+			"php_addr":        phpAddr,
 			"php_runtime_dir": phpRuntimeDir,
-			"php_ini":        phpIni,
-			"php_extensions": phpExtensionDir,
-			"uptime_seconds": int64(time.Since(started).Seconds()),
-			"nextcloud_dir":  nextcloudDir,
-			"data_dir":       dataDir,
+			"php_ini":         phpIni,
+			"php_extensions":  phpExtensionDir,
+			"uptime_seconds":  int64(time.Since(started).Seconds()),
+			"nextcloud_dir":   nextcloudDir,
+			"data_dir":        dataDir,
 		})
 	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

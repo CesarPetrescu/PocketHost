@@ -9,6 +9,16 @@ Use this runbook before calling an Android change done.
 - notification permission granted
 - battery optimization exception considered for long tests
 
+For an x86_64 emulator smoke test, use:
+
+```bash
+./scripts/verify-android-emulator.sh
+```
+
+The script builds the debug APK, installs the x86_64 split on the connected
+emulator, taps **Start all**, checks the foreground notification, confirms the
+default daemon processes, and probes `/health` from inside Android.
+
 ## Steps
 
 ### Build and stage split APKs
@@ -31,10 +41,10 @@ for broad sideload compatibility. These are debug-signed developer artifacts.
 5. Run local probes:
 
 ```bash
-adb shell 'toybox wget -qO- http://127.0.0.1:8099/health || true'
-adb shell 'toybox wget -qO- http://127.0.0.1:8080/health || true'
-adb shell 'toybox wget -qO- http://127.0.0.1:8090/health || true'
-adb shell 'toybox wget -qO- http://127.0.0.1:8088/health || true'
+adb shell "printf 'GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n' | nc -w 3 127.0.0.1 8099"
+adb shell "printf 'GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n' | nc -w 3 127.0.0.1 8080"
+adb shell "printf 'GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n' | nc -w 3 127.0.0.1 8090"
+adb shell "printf 'GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n' | nc -w 3 127.0.0.1 8088"
 ```
 
 6. Open Logs screen and confirm lines are visible.
@@ -57,7 +67,7 @@ adb shell 'toybox wget -qO- http://127.0.0.1:8088/health || true'
 3. From `adb shell`, verify local health still works without a token:
 
 ```bash
-toybox wget -qO- http://127.0.0.1:8099/health || true
+printf 'GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n' | nc -w 3 127.0.0.1 8099
 ```
 
 4. Verify token-gated endpoints reject unauthenticated calls. Example:
