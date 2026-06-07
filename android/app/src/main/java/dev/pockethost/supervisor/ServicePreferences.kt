@@ -28,6 +28,7 @@ object ServicePreferences {
     private const val KEY_NEXTCLOUD_ENABLED = "nextcloud_enabled"
     private const val KEY_NEXTCLOUD_INSTALLED_VERSION = "nextcloud_installed_version"
     private const val KEY_NEXTCLOUD_ADMIN_USER = "nextcloud_admin_user"
+    private const val KEY_NEXTCLOUD_ADMIN_PASSWORD = "nextcloud_admin_password"
     private const val KEY_NEXTCLOUD_TRUSTED_DOMAIN = "nextcloud_trusted_domain"
     private const val KEY_NEXTCLOUD_PHP_MEMORY_LIMIT = "nextcloud_php_memory_limit"
 
@@ -59,6 +60,7 @@ object ServicePreferences {
         val enabled: Boolean = false,
         val installedVersion: String = "",
         val adminUser: String = "admin",
+        val adminPassword: String = "pockethost",
         val trustedDomain: String = "localhost",
         val phpMemoryLimit: String = "512M"
     )
@@ -277,6 +279,7 @@ object ServicePreferences {
             enabled = p.getBoolean(KEY_NEXTCLOUD_ENABLED, false),
             installedVersion = p.getString(KEY_NEXTCLOUD_INSTALLED_VERSION, "").orEmpty(),
             adminUser = p.getString(KEY_NEXTCLOUD_ADMIN_USER, "admin").orEmpty(),
+            adminPassword = p.getString(KEY_NEXTCLOUD_ADMIN_PASSWORD, "pockethost").orEmpty(),
             trustedDomain = p.getString(KEY_NEXTCLOUD_TRUSTED_DOMAIN, "localhost").orEmpty(),
             phpMemoryLimit = p.getString(KEY_NEXTCLOUD_PHP_MEMORY_LIMIT, "512M").orEmpty()
         )
@@ -287,6 +290,7 @@ object ServicePreferences {
             .putBoolean(KEY_NEXTCLOUD_ENABLED, settings.enabled)
             .putString(KEY_NEXTCLOUD_INSTALLED_VERSION, settings.installedVersion.trim())
             .putString(KEY_NEXTCLOUD_ADMIN_USER, settings.adminUser.trim())
+            .putString(KEY_NEXTCLOUD_ADMIN_PASSWORD, settings.adminPassword)
             .putString(KEY_NEXTCLOUD_TRUSTED_DOMAIN, settings.trustedDomain.trim())
             .putString(KEY_NEXTCLOUD_PHP_MEMORY_LIMIT, settings.phpMemoryLimit.trim())
             .apply()

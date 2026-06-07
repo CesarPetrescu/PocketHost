@@ -594,6 +594,7 @@ private fun NextcloudScreen(context: Context, statuses: Map<String, ServiceStatu
     val existing = remember { ServicePreferences.nextcloudSettings(context) }
     var enabled by remember { mutableStateOf(existing.enabled) }
     var adminUser by remember { mutableStateOf(existing.adminUser) }
+    var adminPassword by remember { mutableStateOf(existing.adminPassword) }
     var trustedDomain by remember { mutableStateOf(existing.trustedDomain) }
     var phpMemoryLimit by remember { mutableStateOf(existing.phpMemoryLimit) }
     var message by remember { mutableStateOf("") }
@@ -607,6 +608,7 @@ private fun NextcloudScreen(context: Context, statuses: Map<String, ServiceStatu
                 enabled = enabled,
                 installedVersion = existing.installedVersion,
                 adminUser = adminUser,
+                adminPassword = adminPassword,
                 trustedDomain = trustedDomain,
                 phpMemoryLimit = phpMemoryLimit
             )
@@ -689,6 +691,13 @@ private fun NextcloudScreen(context: Context, statuses: Map<String, ServiceStatu
                         value = adminUser,
                         onValueChange = { adminUser = it },
                         label = { Text("Admin username") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = adminPassword,
+                        onValueChange = { adminPassword = it },
+                        label = { Text("Initial admin password") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )

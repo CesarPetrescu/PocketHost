@@ -104,7 +104,10 @@ object ServiceRegistry {
                     "--php-extension-dir", AppPaths.phpExtensionsDir(context).absolutePath,
                     "--php-memory-limit", ServicePreferences.nextcloudSettings(context).phpMemoryLimit.ifBlank { "512M" },
                     "--nextcloud-dir", AppPaths.nextcloudAppDir(context).absolutePath,
-                    "--data-dir", AppPaths.nextcloudDataDir(context).absolutePath
+                    "--data-dir", AppPaths.nextcloudDataDir(context).absolutePath,
+                    "--admin-user", ServicePreferences.nextcloudSettings(context).adminUser.ifBlank { "admin" },
+                    "--admin-pass", ServicePreferences.nextcloudSettings(context).adminPassword.ifBlank { "pockethost" },
+                    "--trusted-domain", ServicePreferences.nextcloudSettings(context).trustedDomain.ifBlank { "localhost" }
                 )
             },
             preflight = { context -> ServicePreferences.nextcloudPreflight(context) },

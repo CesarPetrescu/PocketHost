@@ -27,6 +27,9 @@ func main() {
 	var phpMemoryLimit string
 	var nextcloudDir string
 	var dataDir string
+	var adminUser string
+	var adminPass string
+	var trustedDomain string
 	flag.StringVar(&addr, "addr", pocket.Env("POCKETHOST_NEXTCLOUD_ADDR", "127.0.0.1:8092"), "public wrapper listen address")
 	flag.StringVar(&phpAddr, "php-addr", pocket.Env("POCKETHOST_NEXTCLOUD_PHP_ADDR", "127.0.0.1:8093"), "loopback PHP listen address")
 	flag.StringVar(&phpPath, "php", pocket.Env("POCKETHOST_PHP", "./libphp.so"), "PHP executable path")
@@ -36,6 +39,9 @@ func main() {
 	flag.StringVar(&phpMemoryLimit, "php-memory-limit", pocket.Env("POCKETHOST_PHP_MEMORY_LIMIT", "512M"), "PHP memory_limit override")
 	flag.StringVar(&nextcloudDir, "nextcloud-dir", pocket.Env("POCKETHOST_NEXTCLOUD_DIR", "./data/nextcloud/server"), "Nextcloud server directory")
 	flag.StringVar(&dataDir, "data-dir", pocket.Env("POCKETHOST_NEXTCLOUD_DATA", "./data/nextcloud/data"), "Nextcloud data directory")
+	flag.StringVar(&adminUser, "admin-user", pocket.Env("POCKETHOST_NEXTCLOUD_ADMIN_USER", "admin"), "initial Nextcloud admin username")
+	flag.StringVar(&adminPass, "admin-pass", pocket.Env("POCKETHOST_NEXTCLOUD_ADMIN_PASS", "pockethost"), "initial Nextcloud admin password")
+	flag.StringVar(&trustedDomain, "trusted-domain", pocket.Env("POCKETHOST_NEXTCLOUD_TRUSTED_DOMAIN", "localhost"), "initial Nextcloud trusted domain")
 	flag.Parse()
 
 	log := pocket.NewLogger("nextcloudd")
@@ -44,6 +50,9 @@ func main() {
 	phpEnv := buildPHPEnv(phpRuntimeDir, phpIni, phpExtensionDir, dataDir)
 	if err := preflight(addr, phpPath, phpRuntimeDir, phpIni, phpExtensionDir, nextcloudDir, dataDir, phpEnv); err != nil {
 		log.Fatalf("preflight failed: %v", err)
+	}
+	if err := bootstrapNextcloud(phpPath, phpIni, phpExtensionDir, nextcloudDir, dataDir, adminUser, adminPass, trustedDomain, phpEnv, log); err != nil {
+		log.Fatalf("bootstrap failed: %v", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -107,6 +116,90 @@ func main() {
 	if err := pocket.ListenAndServeGracefully(addr, mux, log); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("server stopped: %v", err)
 	}
+}
+
+func bootstrapNextcloud(phpPath, phpIni, phpExtensionDir, nextcloudDir, dataDir, adminUser, adminPass, trustedDomain string, phpEnv []string, log logSink) error {
+	if nextcloudInstalled(nextcloudDir) {
+		return nil
+	}
+	adminUser = strings.TrimSpace(adminUser)
+	if adminUser == "" {
+		adminUser = "admin"
+	}
+	if adminPass == "" {
+		adminPass = "pockethost"
+	}
+	trustedDomain = strings.TrimSpace(trustedDomain)
+	if trustedDomain == "" {
+		trustedDomain = "localhost"
+	}
+	log.Printf("installing Nextcloud with SQLite data_dir=%s admin_user=%s trusted_domain=%s", dataDir, adminUser, trustedDomain)
+	if err := writeBootstrapConfig(nextcloudDir); err != nil {
+		return err
+	}
+	if err := runOcc(phpPath, phpIni, phpExtensionDir, nextcloudDir, phpEnv,
+		"maintenance:install",
+		"--database", "sqlite",
+		"--admin-user", adminUser,
+		"--admin-pass", adminPass,
+		"--data-dir", dataDir,
+	); err != nil {
+		return err
+	}
+	if err := runOcc(phpPath, phpIni, phpExtensionDir, nextcloudDir, phpEnv,
+		"config:system:set", "trusted_domains", "0", "--value", trustedDomain,
+	); err != nil {
+		return err
+	}
+	if trustedDomain != "127.0.0.1" {
+		if err := runOcc(phpPath, phpIni, phpExtensionDir, nextcloudDir, phpEnv,
+			"config:system:set", "trusted_domains", "1", "--value", "127.0.0.1",
+		); err != nil {
+			return err
+		}
+	}
+	if err := runOcc(phpPath, phpIni, phpExtensionDir, nextcloudDir, phpEnv,
+		"config:system:set", "overwrite.cli.url", "--value", "http://"+trustedDomain,
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
+func writeBootstrapConfig(nextcloudDir string) error {
+	configDir := filepath.Join(nextcloudDir, "config")
+	configPath := filepath.Join(configDir, "config.php")
+	if _, err := os.Stat(configPath); err == nil {
+		return nil
+	}
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		return fmt.Errorf("create Nextcloud config dir: %w", err)
+	}
+	// Android app-private storage is reachable through multiple filesystem paths.
+	// Nextcloud's local storage symlink guard can reject that during first install,
+	// so the experimental Android wrapper opts into symlink-tolerant local storage.
+	config := "<?php\n$CONFIG = array (\n  'localstorage.allowsymlinks' => true,\n);\n"
+	return os.WriteFile(configPath, []byte(config), 0600)
+}
+
+func nextcloudInstalled(nextcloudDir string) bool {
+	configPath := filepath.Join(nextcloudDir, "config", "config.php")
+	data, err := os.ReadFile(configPath)
+	return err == nil && strings.Contains(string(data), "'installed' => true")
+}
+
+func runOcc(phpPath, phpIni, phpExtensionDir, nextcloudDir string, phpEnv []string, args ...string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	cmdArgs := append([]string{"-c", phpIni, "-d", "extension_dir=" + phpExtensionDir, "occ"}, args...)
+	cmd := exec.CommandContext(ctx, phpPath, cmdArgs...)
+	cmd.Dir = nextcloudDir
+	cmd.Env = append(os.Environ(), phpEnv...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("php occ %s failed: %v: %s", strings.Join(args, " "), err, strings.TrimSpace(string(output)))
+	}
+	return nil
 }
 
 func preflight(addr, phpPath, phpRuntimeDir, phpIni, phpExtensionDir, nextcloudDir, dataDir string, phpEnv []string) error {

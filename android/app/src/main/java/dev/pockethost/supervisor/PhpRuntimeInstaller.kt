@@ -2,6 +2,7 @@ package dev.pockethost.supervisor
 
 import android.content.Context
 import android.os.Build
+import android.system.Os
 import java.io.File
 import java.util.zip.ZipInputStream
 
@@ -65,7 +66,10 @@ object PhpRuntimeInstaller {
             if (runtimeDir.exists()) runtimeDir.deleteRecursively()
             runtimeDir.parentFile?.mkdirs()
             tempDir.renameTo(runtimeDir)
+            ensureAndroidSupportLink(runtimeDir, abi)
             marker.writeText("abi=$abi\n")
+        } else {
+            ensureAndroidSupportLink(runtimeDir, abi)
         }
         writePhpIni(context, abi, memoryLimit)
         return runtimeDir
@@ -173,6 +177,18 @@ object PhpRuntimeInstaller {
         return manifestHasExtension ||
             listOf("$name.so", "lib$name.so").any { File(dir, it).exists() } ||
             name in setOf("ctype", "session", "zlib", "posix")
+    }
+
+    private fun ensureAndroidSupportLink(runtimeDir: File, abi: String) {
+        val libDir = File(runtimeDir, "lib")
+        val link = File(libDir, "libandroid-support.so")
+        if (link.exists()) return
+        libDir.mkdirs()
+        val systemLibc = when (abi) {
+            "arm64-v8a", "x86_64" -> "/system/lib64/libc.so"
+            else -> "/system/lib/libc.so"
+        }
+        Os.symlink(systemLibc, link.absolutePath)
     }
 
     private fun safeZipTarget(root: File, name: String): File {
