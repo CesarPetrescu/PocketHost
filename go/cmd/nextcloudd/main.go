@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -12,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"dev.pockethost/daemons/internal/pocket"
@@ -83,6 +85,7 @@ func main() {
 
 	target, _ := url.Parse("http://" + phpAddr)
 	proxy := httputil.NewSingleHostReverseProxy(target)
+	trustedHosts := newDynamicTrustedHosts(phpPath, phpIni, phpExtensionDir, nextcloudDir, phpEnv, log)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -103,6 +106,9 @@ func main() {
 		})
 	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if err := trustedHosts.ensure(r.Host); err != nil {
+			log.Printf("dynamic trusted host update failed host=%s error=%v", r.Host, err)
+		}
 		proxy.ServeHTTP(w, r)
 	})
 
@@ -116,6 +122,74 @@ func main() {
 	if err := pocket.ListenAndServeGracefully(addr, mux, log); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("server stopped: %v", err)
 	}
+}
+
+type dynamicTrustedHosts struct {
+	mu              sync.Mutex
+	seen            map[string]bool
+	phpPath         string
+	phpIni          string
+	phpExtensionDir string
+	nextcloudDir    string
+	phpEnv          []string
+	log             logSink
+}
+
+func newDynamicTrustedHosts(phpPath, phpIni, phpExtensionDir, nextcloudDir string, phpEnv []string, log logSink) *dynamicTrustedHosts {
+	return &dynamicTrustedHosts{
+		seen:            map[string]bool{},
+		phpPath:         phpPath,
+		phpIni:          phpIni,
+		phpExtensionDir: phpExtensionDir,
+		nextcloudDir:    nextcloudDir,
+		phpEnv:          phpEnv,
+		log:             log,
+	}
+}
+
+func (d *dynamicTrustedHosts) ensure(rawHost string) error {
+	host := requestHostname(rawHost)
+	if !isQuickTunnelHost(host) {
+		return nil
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.seen[host] {
+		return nil
+	}
+	if err := runOcc(d.phpPath, d.phpIni, d.phpExtensionDir, d.nextcloudDir, d.phpEnv,
+		"config:system:set", "trusted_domains", "2", "--value", host,
+	); err != nil {
+		return err
+	}
+	if err := runOcc(d.phpPath, d.phpIni, d.phpExtensionDir, d.nextcloudDir, d.phpEnv,
+		"config:system:set", "overwritehost", "--value", host,
+	); err != nil {
+		return err
+	}
+	if err := runOcc(d.phpPath, d.phpIni, d.phpExtensionDir, d.nextcloudDir, d.phpEnv,
+		"config:system:set", "overwriteprotocol", "--value", "https",
+	); err != nil {
+		return err
+	}
+	d.seen[host] = true
+	d.log.Printf("trusted Cloudflare Quick Tunnel host=%s", host)
+	return nil
+}
+
+func requestHostname(rawHost string) string {
+	rawHost = strings.TrimSpace(rawHost)
+	if rawHost == "" {
+		return ""
+	}
+	if host, _, err := net.SplitHostPort(rawHost); err == nil {
+		return strings.ToLower(strings.Trim(host, "[]"))
+	}
+	return strings.ToLower(strings.Trim(strings.Split(rawHost, ":")[0], "[]"))
+}
+
+func isQuickTunnelHost(host string) bool {
+	return host != "" && strings.HasSuffix(host, ".trycloudflare.com")
 }
 
 func bootstrapNextcloud(phpPath, phpIni, phpExtensionDir, nextcloudDir, dataDir, adminUser, adminPass, trustedDomain string, phpEnv []string, log logSink) error {

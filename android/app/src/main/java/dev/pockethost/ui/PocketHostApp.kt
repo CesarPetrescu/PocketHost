@@ -75,6 +75,7 @@ import dev.pockethost.supervisor.NativeBinaryLocator
 import dev.pockethost.supervisor.NextcloudInstaller
 import dev.pockethost.supervisor.PhpRuntimeInstaller
 import dev.pockethost.supervisor.ProcessSupervisor
+import dev.pockethost.supervisor.PublicCollabSuite
 import dev.pockethost.supervisor.ServerCommands
 import dev.pockethost.supervisor.ServicePreferences
 import dev.pockethost.supervisor.ServiceRegistry
@@ -296,6 +297,8 @@ private fun TunnelScreen(context: Context, statuses: Map<String, ServiceStatus>,
     var quickUrl by remember { mutableStateOf(existing.quickUrl.ifBlank { "http://127.0.0.1:8080" }) }
     var message by remember { mutableStateOf("") }
     val latestQuickTunnelUrl = latestQuickTunnelUrl(logs)
+    val matrixQuickTunnelUrl = latestQuickTunnelUrl(logs, "cloudflared-matrix")
+    val nextcloudQuickTunnelUrl = latestQuickTunnelUrl(logs, "cloudflared-nextcloud")
     val credentialPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             runCatching {
@@ -359,6 +362,39 @@ private fun TunnelScreen(context: Context, statuses: Map<String, ServiceStatus>,
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.SemiBold
                     )
+                }
+            }
+        }
+
+        item {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Public Matrix + Nextcloud", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                        StatusChip(statuses["cloudflared-nextcloud"]?.state ?: ServiceState.Stopped, palette)
+                    }
+                    Text(
+                        "Installs Nextcloud assets, writes Matrix config, starts both apps, and opens separate temporary Cloudflare URLs.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Button(
+                        onClick = {
+                            PublicCollabSuite.start(context)
+                            message = "Starting public Matrix + Nextcloud suite"
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.PlayArrow, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Install and host Matrix + Nextcloud")
+                    }
+                    SuiteStatusRow("Matrix", statuses["matrix"], statuses["cloudflared-matrix"], matrixQuickTunnelUrl, palette) {
+                        copyText(context, "Matrix URL", it)
+                    }
+                    SuiteStatusRow("Nextcloud", statuses["nextcloud"], statuses["cloudflared-nextcloud"], nextcloudQuickTunnelUrl, palette) {
+                        copyText(context, "Nextcloud URL", it)
+                    }
                 }
             }
         }
@@ -1040,6 +1076,41 @@ private fun RouteField(label: String, value: String, target: String, enabled: Bo
     }
 }
 @Composable
+private fun SuiteStatusRow(
+    label: String,
+    appStatus: ServiceStatus?,
+    tunnelStatus: ServiceStatus?,
+    publicUrl: String?,
+    palette: StatusPalette,
+    onCopy: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(label, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            StatusChip(appStatus?.state ?: ServiceState.Stopped, palette)
+            Spacer(Modifier.width(6.dp))
+            StatusChip(tunnelStatus?.state ?: ServiceState.Stopped, palette)
+        }
+        if (publicUrl != null) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Mono(publicUrl)
+                }
+                OutlinedButton(onClick = { onCopy(publicUrl) }) {
+                    Text("Copy")
+                }
+            }
+        } else {
+            Text(
+                "Waiting for Cloudflare URL",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
 private fun CompactServiceRow(spec: ServiceSpec, status: ServiceStatus?, palette: StatusPalette) {
     val state = status?.state ?: ServiceState.Stopped
     Card(Modifier.fillMaxWidth()) {
@@ -1178,9 +1249,9 @@ private fun importCloudflareCredential(context: Context, uri: Uri): File {
     return out
 }
 
-private fun latestQuickTunnelUrl(logs: List<LogLine>): String? {
+private fun latestQuickTunnelUrl(logs: List<LogLine>, serviceId: String = "cloudflared"): String? {
     val pattern = Regex("""https://[A-Za-z0-9.-]+\.trycloudflare\.com""")
-    return logs.firstOrNull { it.serviceId == "cloudflared" && pattern.containsMatchIn(it.message) }
+    return logs.firstOrNull { it.serviceId == serviceId && pattern.containsMatchIn(it.message) }
         ?.let { pattern.find(it.message)?.value }
 }
 

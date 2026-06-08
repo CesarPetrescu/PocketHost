@@ -122,6 +122,24 @@ object ServiceRegistry {
             description = "Official cloudflared-compatible tunnel binary slot.",
             args = { context -> ServicePreferences.cloudflaredArgs(context) },
             preflight = { context -> ServicePreferences.cloudflaredPreflight(context) }
+        ),
+        ServiceSpec(
+            id = "cloudflared-matrix",
+            displayName = "Matrix Quick Tunnel",
+            binaryName = "cloudflared",
+            defaultPort = null,
+            startByDefault = false,
+            description = "Temporary public Cloudflare Quick Tunnel for the Matrix homeserver.",
+            args = { listOf("tunnel", "--url", "http://127.0.0.1:6167") }
+        ),
+        ServiceSpec(
+            id = "cloudflared-nextcloud",
+            displayName = "Nextcloud Quick Tunnel",
+            binaryName = "cloudflared",
+            defaultPort = null,
+            startByDefault = false,
+            description = "Temporary public Cloudflare Quick Tunnel for the Nextcloud module.",
+            args = { listOf("tunnel", "--url", "http://127.0.0.1:8092") }
         )
     )
 
