@@ -13,8 +13,18 @@ ANDROID_API="${ANDROID_API:-26}"
 ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/Android/Sdk}}"
 NDK_ROOT="${ANDROID_NDK_ROOT:-}"
 
+host_tag() {
+  case "$(uname -s 2>/dev/null || echo unknown)" in
+    MINGW*|MSYS*|CYGWIN*) echo "windows-x86_64" ;;
+    Darwin*) echo "darwin-x86_64" ;;
+    *) echo "linux-x86_64" ;;
+  esac
+}
+
 find_ndk_root() {
-  if [[ -n "$NDK_ROOT" && -d "$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin" ]]; then
+  local host
+  host="$(host_tag)"
+  if [[ -n "$NDK_ROOT" && -d "$NDK_ROOT/toolchains/llvm/prebuilt/$host/bin" ]]; then
     echo "$NDK_ROOT"
     return
   fi
@@ -31,7 +41,11 @@ ndk_clang() {
     echo "Android NDK not found. Set ANDROID_NDK_ROOT or install NDK under $ANDROID_SDK_ROOT/ndk." >&2
     exit 2
   fi
-  local cc="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/${target}${ANDROID_API}-clang"
+  local host ext cc
+  host="$(host_tag)"
+  ext=""
+  [[ "$host" == windows-* ]] && ext=".cmd"
+  cc="$ndk/toolchains/llvm/prebuilt/$host/bin/${target}${ANDROID_API}-clang$ext"
   if [[ ! -x "$cc" ]]; then
     echo "Android NDK clang not found: $cc" >&2
     exit 2
@@ -47,7 +61,7 @@ else
   ABIS=("$@")
 fi
 
-cmds=(hostd webd filed ddnsd proxyd)
+cmds=(hostd webd filed ddnsd proxyd nextcloudd)
 
 build_one() {
   local abi="$1"

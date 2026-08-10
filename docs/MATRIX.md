@@ -2,14 +2,16 @@
 
 ## Recommendation
 
-Use Conduit as the selected first Matrix candidate. Conduit is a lightweight Matrix homeserver written in Rust, and the current upstream repository records Apache-2.0 licensing. Treat other Conduit-family forks as separate database owners unless upstream explicitly documents a safe migration. Treat Dendrite as a gated Go fallback only, because its current upstream status and license need explicit review before bundling or redistribution.
+Use Tuwunel as the selected first Matrix candidate. Tuwunel is the successor path for the Conduit/conduwuit family and keeps the Rust-first Matrix slot aligned with PocketHost's architecture. Treat every Conduit-family database as owned by the exact selected binary unless upstream explicitly documents a safe migration. Treat Dendrite as a gated Go fallback only, because its current upstream status and license need explicit review before bundling or redistribution.
 
 ## Selected candidate
 
 ```text
-Name: Conduit
-Source: https://gitlab.com/famedly/conduit
-License: Apache-2.0
+Name: Tuwunel
+Version: v1.7.0
+Source: https://github.com/matrix-construct/tuwunel
+Docs: https://matrix-construct.github.io/tuwunel/
+License: Apache-2.0 family; verify upstream release license before bundling
 Bundling status: not bundled yet
 Android status: compatibility not verified yet
 ```
@@ -25,7 +27,7 @@ android/app/src/main/jniLibs/arm64-v8a/libmatrixd.so
 Launch contract:
 
 ```bash
-libmatrixd.so --addr 127.0.0.1:6167 --data-dir "$APP_FILES/data/matrix"
+libmatrixd.so --config "$APP_FILES/config/tuwunel.toml"
 ```
 
 Health contract:
@@ -48,6 +50,14 @@ GET /_matrix/client/versions
 - log level
 - backup/export
 - database implementation/version
+
+## Current Android app behavior
+
+- The Matrix screen writes `config/tuwunel.toml` under app-private storage.
+- The supervisor launches `libmatrixd.so --config <tuwunel.toml>`.
+- The health probe remains `GET /_matrix/client/versions`.
+- Missing `libmatrixd.so` is surfaced as `Missing binary`; missing server-name configuration is a preflight failure.
+- Build staging is handled by `scripts/build-tuwunel-android.sh` for `arm64-v8a` and `x86_64`.
 
 ## Hard rules
 

@@ -7,3 +7,9 @@ android/.gradle/
 android/app/build/
 rust/matrixd/target/
 releases/apk/*.apk
+
+# Bundled runtime payloads
+android/deps/
+
+# Claude Code local session state
+.claude/

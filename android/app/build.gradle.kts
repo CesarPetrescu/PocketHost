@@ -50,6 +50,20 @@ android {
             useLegacyPackaging = true
         }
     }
+
+    sourceSets {
+        getByName("main") {
+            // Large runtime payloads (PHP-for-Android runtime zips, Nextcloud server zip)
+            // are bundled as assets but kept out of git. Their location is configurable so
+            // each machine can point at its own staging dir:
+            //   -PpocketHostAssetsDir=/path  (gradle property)  OR  POCKETHOST_ASSETS_DIR env
+            // Default: <project>/deps/assets (gitignored).
+            val extraAssets = (project.findProperty("pocketHostAssetsDir") as String?)
+                ?: System.getenv("POCKETHOST_ASSETS_DIR")
+                ?: "${rootDir}/deps/assets"
+            assets.srcDirs("src/main/assets", extraAssets)
+        }
+    }
 }
 
 dependencies {

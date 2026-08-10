@@ -22,7 +22,47 @@ SHA256:
 Modifications: no source modifications; cross-compiled from official source for Android with version/build-time linker metadata.
 
 Important non-vendored integrations:
-- Tuwunel, Conduit, and Dendrite are optional Matrix homeserver implementations. PocketHost provides a supervisor slot and configuration contract, not a vendored Matrix implementation.
-- Nextcloud is not included. If an experimental Linux-userland module is added later, it must preserve Nextcloud and dependency license notices separately.
+- Tuwunel v1.7.0 is the selected Matrix target. PocketHost provides the supervisor/configuration contract and build script, but no Tuwunel binary is bundled until version, source, license, target, SHA256, and modifications are recorded here.
+- Nextcloud Server v32.0.11 is the selected experimental module target. PocketHost provides an isolated wrapper and staging script, but no Nextcloud/PHP runtime payload is bundled until all third-party notices, licenses, targets, SHA256 hashes, and modifications are recorded here.
+- Conduit and Dendrite remain non-default Matrix alternatives. Dendrite requires explicit legal/maintenance review before bundling.
 
 The PocketHost name and any future project logos are not granted as trademarks by the Apache-2.0 license unless explicitly stated elsewhere.
+
+Runtime artifact hashes from local Android integration pass (2026-06-04)
+---------------------------------------------------------------------
+
+Tuwunel v1.7.0, built from source with Rust/NDK for Android and staged as libmatrixd.so:
+- arm64-v8a: d4e1cbdfed23945f167908a5160746ae085b79f2001d51ce8e0be59d1d7798c5
+- x86_64: 6ef3500050218f572b5e0ef486126a8687b2a45ec5b8ca2996014af0e420753d
+
+PocketHost nextcloudd wrapper, built from local Go source and staged as libnextcloudd.so:
+- arm64-v8a: e49cf9986fb966e1a5985930a847f29070afccfb576805f24d1a919a266f302b
+- x86_64: abacdaac327a71b91f24852d619a2125c6a1a919bde333cf971a5f2d107ceb1a
+
+Nextcloud Server v32.0.11 ZIP payload staged outside the repo under D:\PocketHostDeps and packaged by Gradle as an asset:
+- nextcloud-server-32.0.11.zip: 4f582463f80f63e84d306a2b2cc45ca3318d505939b2d2d4eb135ed5ac909277
+
+PHP Android runtime status:
+- libphp.so is not staged in this pass. Nextcloud remains disabled by preflight until real ARM64 and x86_64 Android PHP runtimes with required SQLite/minimal Nextcloud extensions are available.
+
+PHP runtime build attempt (2026-06-04)
+--------------------------------------
+
+Termux-derived source path selected for PHP Android builds:
+- Source tree: D:\PocketHostDeps\termux-packages
+- PHP package source: https://github.com/termux/termux-packages/tree/master/packages/php
+- Stage scripts added for PocketHost runtime packaging.
+
+Build blocker on this Windows host:
+- No Docker executable is installed.
+- WSL is present only as a launcher and has no usable Linux distro.
+- Therefore PHP was not compiled and no libphp.so hash is recorded.
+
+No PHP binaries are bundled from unverified third-party sources.
+
+Updated nextcloudd hashes after PHP-runtime preflight integration (2026-06-04)
+----------------------------------------------------------------------------
+
+PocketHost nextcloudd wrapper rebuilt from local Go source:
+- arm64-v8a: f9827dfddf286f19d633d81e2655b91447b829e9c35393646f06cb9e0f47903b
+- x86_64: 6a0f638366a768ab3d579b278aa090d3a30a6d4666b76df0005406ff912df225

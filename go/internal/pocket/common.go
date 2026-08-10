@@ -76,7 +76,7 @@ func SafeJoin(root, requested string) (string, error) {
 	if root == "" {
 		return "", errors.New("empty root")
 	}
-	if filepath.IsAbs(requested) {
+	if filepath.IsAbs(requested) || strings.HasPrefix(requested, "/") || strings.HasPrefix(requested, "\\") {
 		return "", fmt.Errorf("absolute paths are not allowed")
 	}
 	clean := filepath.Clean(requested)

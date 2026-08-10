@@ -69,12 +69,49 @@ object ServiceRegistry {
             binaryName = "matrixd",
             defaultPort = 6167,
             startByDefault = false,
-            description = "Rust/Go Matrix homeserver slot. Placeholder binary can be replaced later.",
+            description = "Dendrite Matrix homeserver (Go). Experimental until Android runtime is verified.",
             args = { context ->
-                listOf("--addr", listenAddr(context, 6167), "--data-dir", AppPaths.matrixRoot(context).absolutePath)
+                val cfg = ServicePreferences.writeDendriteConfig(context)
+                val base = listOf(
+                    "-config", cfg.absolutePath,
+                    "-http-bind-address", listenAddr(context, 6167)
+                )
+                // Dendrite refuses open registration without an explicit acknowledgement flag.
+                if (ServicePreferences.matrixSettings(context).registrationEnabled) {
+                    base + "-really-enable-open-registration"
+                } else {
+                    base
+                }
             },
+            preflight = { context -> ServicePreferences.matrixPreflight(context) },
             env = { context -> bindEnv(context) },
             healthPath = "/_matrix/client/versions"
+        ),
+        ServiceSpec(
+            id = "nextcloud",
+            displayName = "Nextcloud Experimental",
+            binaryName = "nextcloudd",
+            defaultPort = 8092,
+            startByDefault = false,
+            description = "Experimental PHP + SQLite Nextcloud wrapper. Minimal/testing only.",
+            args = { context ->
+                listOf(
+                    "--addr", listenAddr(context, 8092),
+                    "--php-addr", "${ServicePreferences.LOOPBACK_HOST}:8093",
+                    "--php", AppPaths.phpExecutable(context).absolutePath,
+                    "--php-runtime-dir", AppPaths.phpRuntimeDir(context).absolutePath,
+                    "--php-ini", AppPaths.phpIni(context).absolutePath,
+                    "--php-extension-dir", AppPaths.phpExtensionsDir(context).absolutePath,
+                    "--php-memory-limit", ServicePreferences.nextcloudSettings(context).phpMemoryLimit.ifBlank { "512M" },
+                    "--nextcloud-dir", AppPaths.nextcloudAppDir(context).absolutePath,
+                    "--data-dir", AppPaths.nextcloudDataDir(context).absolutePath,
+                    "--admin-user", ServicePreferences.nextcloudSettings(context).adminUser.ifBlank { "admin" },
+                    "--admin-pass", ServicePreferences.nextcloudSettings(context).adminPassword.ifBlank { "pockethost" },
+                    "--trusted-domain", ServicePreferences.nextcloudSettings(context).trustedDomain.ifBlank { "localhost" }
+                )
+            },
+            preflight = { context -> ServicePreferences.nextcloudPreflight(context) },
+            env = { context -> bindEnv(context) }
         ),
         ServiceSpec(
             id = "cloudflared",
@@ -83,14 +120,26 @@ object ServiceRegistry {
             defaultPort = null,
             startByDefault = false,
             description = "Official cloudflared-compatible tunnel binary slot.",
-            args = { context ->
-                val config = AppPaths.cloudflaredConfig(context)
-                listOf("tunnel", "--config", config.absolutePath, "run")
-            },
-            preflight = { context ->
-                val config = AppPaths.cloudflaredConfig(context)
-                if (config.exists()) null else "missing tunnel config: ${config.absolutePath}"
-            }
+            args = { context -> ServicePreferences.cloudflaredArgs(context) },
+            preflight = { context -> ServicePreferences.cloudflaredPreflight(context) }
+        ),
+        ServiceSpec(
+            id = "cloudflared-matrix",
+            displayName = "Matrix Quick Tunnel",
+            binaryName = "cloudflared",
+            defaultPort = null,
+            startByDefault = false,
+            description = "Temporary public Cloudflare Quick Tunnel for the Matrix homeserver.",
+            args = { listOf("tunnel", "--url", "http://127.0.0.1:6167") }
+        ),
+        ServiceSpec(
+            id = "cloudflared-nextcloud",
+            displayName = "Nextcloud Quick Tunnel",
+            binaryName = "cloudflared",
+            defaultPort = null,
+            startByDefault = false,
+            description = "Temporary public Cloudflare Quick Tunnel for the Nextcloud module.",
+            args = { listOf("tunnel", "--url", "http://127.0.0.1:8092") }
         )
     )
 

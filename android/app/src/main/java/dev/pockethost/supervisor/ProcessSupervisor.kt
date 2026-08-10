@@ -92,6 +92,14 @@ object ProcessSupervisor {
                 env["HOME"] = appContext.filesDir.absolutePath
                 env["TMPDIR"] = File(appContext.cacheDir, "tmp").apply { mkdirs() }.absolutePath
                 env["POCKETHOST_FILES"] = appContext.filesDir.absolutePath
+                // Daemons built with the NDK (e.g. the Rust/Tuwunel matrixd) dynamically
+                // link libc++_shared.so, which we ship alongside them in jniLibs and which
+                // Android extracts into nativeLibraryDir. A raw exec'd child does not search
+                // that dir by default, so point the dynamic linker at it explicitly.
+                env["LD_LIBRARY_PATH"] = listOfNotNull(
+                    appContext.applicationInfo.nativeLibraryDir,
+                    env["LD_LIBRARY_PATH"]?.takeIf { it.isNotBlank() }
+                ).joinToString(":")
                 env.putAll(spec.env(appContext))
 
                 val process = pb.start()

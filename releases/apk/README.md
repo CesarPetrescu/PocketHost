@@ -1,6 +1,6 @@
-# PocketHost APK artifacts
+# PocketHost APK Artifacts
 
-Run from the repository root:
+This directory receives locally generated APKs from:
 
 ```bash
 ./scripts/package-android.sh release

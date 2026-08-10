@@ -1,107 +1,233 @@
 # PocketHost
 
-PocketHost is an Android mini-server control plane for repurposed phones and tablets.
+PocketHost turns an Android phone or tablet into a small, supervised personal
+server.
 
-It runs an Android-native supervisor app and launches small native daemons for web, files, DDNS, proxying, host status, Matrix, and Cloudflare Tunnel integration.
+It is built for spare devices: a phone on a charger, an old tablet on a shelf,
+or an emulator used as a lab box. The Android app is the control panel. Native
+daemons do the actual serving work.
 
+PocketHost is currently a developer-sideload MVP, not a production release. It
+can build, run the core local daemons, package split APKs, and expose selected
+services through Cloudflare Tunnel, but release signing, public distribution,
+automated device CI, and full Matrix/Nextcloud validation are still in progress.
 
-## Current project status
+## What It Does
 
-PocketHost is an early, developer-sideload MVP. The repository contains a working Android control-plane shell, a foreground supervisor, Go daemon sources with local health/security tests, prebuilt daemon artifacts in `jniLibs/` for the configured Android ABIs, a Rust Matrix placeholder, and a Cloudflare Tunnel binary slot. It is **not** release-ready for public distribution: release signing, automated Android device validation, Cloudflare credential import, public tunnel verification, Matrix homeserver replacement, and Google Play policy work remain pending.
+PocketHost provides:
 
-Use `./scripts/ci-local.sh` for the local Go/test verification baseline and `./scripts/package-android.sh release` to create local split APKs under `releases/apk/`. The generated release variant is currently debug-signed for sideload testing only.
+- Android dashboard for starting, stopping, restarting, and inspecting services.
+- Foreground supervisor service with a persistent notification while daemons run.
+- Local web server for static files.
+- Token-protected file API for browse, upload, download, and delete.
+- Host web control panel served by `hostd`.
+- Local reverse proxy for service routing.
+- Optional DDNS updater.
+- Optional Cloudflare Tunnel supervisor slot.
+- Optional Matrix homeserver slot.
+- Experimental Nextcloud wrapper slot.
+- SQLite-backed log persistence and diagnostics bundle export.
+- Loopback-first security defaults with explicit LAN exposure toggle.
 
-## Final stack
+## Current Status
 
-| Layer | Choice |
-|---|---|
-| Android app | Kotlin + Jetpack Compose |
-| Long-running control | ForegroundService with persistent notification |
-| App database | SQLite |
-| Custom daemons | Go |
-| Matrix slot | Rust-first; Go fallback only after license/maintenance review |
-| Public ingress | official `cloudflared` supervised by the app |
-| Nextcloud | out of scope for PocketHost core |
-| License | Apache-2.0 |
+The useful core works today:
 
-## Repository layout
+- Android app builds with Kotlin, Jetpack Compose, and AGP.
+- Default Go daemons build and pass local tests.
+- Local daemon verification passes.
+- Debug APKs build for `arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`, and
+  `universal`.
+- Native daemon artifacts are already staged under `android/app/src/main/jniLibs`.
+
+Still not public-release ready:
+
+- Release builds are debug-signed.
+- Google Play distribution is not implemented.
+- Android device and emulator tests are not automated in CI.
+- Matrix direction needs cleanup across docs and runtime artifacts.
+- Nextcloud is experimental and depends on PHP runtime assets.
+- Cloudflare public route verification still needs device evidence.
+- Production update/signature handling for daemon bundles is not implemented.
+
+## System Design
+
+PocketHost is deliberately split into a control plane and a data plane.
+
+```text
+Android app, Kotlin + Jetpack Compose
+  -> ServerCommands
+  -> ServerForegroundService
+  -> ProcessSupervisor
+  -> native daemon executables from applicationInfo.nativeLibraryDir
+  -> local HTTP services on 127.0.0.1
+  -> optional Cloudflare Tunnel for public ingress
+```
+
+### Control Plane
+
+The Android app owns device-specific responsibilities:
+
+- UI and service controls.
+- Foreground service lifecycle.
+- Persistent notification and stop surface.
+- Boot receiver for optional autostart.
+- Service configuration and preflight checks.
+- Health polling.
+- Log collection, redaction, retention, and display.
+- Diagnostics bundle creation.
+
+Key files:
+
+- `android/app/src/main/java/dev/pockethost/ui/PocketHostApp.kt`
+- `android/app/src/main/java/dev/pockethost/supervisor/ServerForegroundService.kt`
+- `android/app/src/main/java/dev/pockethost/supervisor/ProcessSupervisor.kt`
+- `android/app/src/main/java/dev/pockethost/supervisor/ServiceRegistry.kt`
+- `android/app/src/main/java/dev/pockethost/supervisor/ServicePreferences.kt`
+
+### Data Plane
+
+Native daemons own the service workloads:
+
+| Service | Binary | Default | Port | Purpose |
+|---|---|---:|---:|---|
+| Host API | `libhostd.so` | on | 8099 | Host health, web panel, daemon status aggregation |
+| Web Server | `libwebd.so` | on | 8080 | Static/local web hosting |
+| MiniCloud Files | `libfiled.so` | on | 8090 | Token-protected file API |
+| Local Reverse Proxy | `libproxyd.so` | on | 8088 | Host-based local reverse proxy |
+| DDNS Updater | `libddnsd.so` | off | 8091 | Optional Cloudflare DNS updater |
+| Matrix Server | `libmatrixd.so` | off | 6167 | Matrix homeserver slot |
+| Nextcloud Experimental | `libnextcloudd.so` | off | 8092 | Experimental PHP/Nextcloud wrapper |
+| Cloudflare Tunnel | `libcloudflared.so` | off | n/a | Optional public tunnel client |
+
+The Go daemons live under `go/cmd/*`. Shared daemon safety code lives in
+`go/internal/pocket`.
+
+### Android Native Packaging
+
+The daemon files are packaged as native library artifacts:
+
+```text
+android/app/src/main/jniLibs/arm64-v8a/libhostd.so
+android/app/src/main/jniLibs/arm64-v8a/libwebd.so
+android/app/src/main/jniLibs/arm64-v8a/libfiled.so
+android/app/src/main/jniLibs/arm64-v8a/libproxyd.so
+android/app/src/main/jniLibs/arm64-v8a/libddnsd.so
+android/app/src/main/jniLibs/arm64-v8a/libmatrixd.so
+android/app/src/main/jniLibs/arm64-v8a/libnextcloudd.so
+android/app/src/main/jniLibs/arm64-v8a/libcloudflared.so
+android/app/src/main/jniLibs/arm64-v8a/libphp.so
+```
+
+The `.so` suffix is an Android packaging mechanism. PocketHost launches these
+files as executable child processes from `applicationInfo.nativeLibraryDir`.
+
+### Runtime Flow
+
+```text
+User taps Start all
+  -> Compose calls ServerCommands
+  -> Android starts ServerForegroundService
+  -> ProcessSupervisor resolves each ServiceSpec
+  -> NativeBinaryLocator finds lib<name>.so
+  -> ProcessBuilder starts the daemon
+  -> stdout/stderr stream into LogBus
+  -> LogBus redacts and stores logs in SQLite
+  -> HealthMonitor probes local HTTP endpoints
+  -> Compose state updates through StateFlow
+```
+
+### Network Model
+
+PocketHost binds services to loopback by default:
+
+```text
+127.0.0.1:8099 hostd
+127.0.0.1:8080 webd
+127.0.0.1:8090 filed
+127.0.0.1:8088 proxyd
+127.0.0.1:8091 ddnsd
+127.0.0.1:6167 matrixd
+127.0.0.1:8092 nextcloudd
+```
+
+The Settings screen has an explicit LAN exposure toggle. When enabled, the app
+passes `0.0.0.0:<port>` and sets `POCKETHOST_ALLOW_PUBLIC_BIND=true`. Without
+that environment variable, the Go daemons refuse non-loopback bind addresses.
+
+Public internet access should go through Cloudflare Tunnel or another deliberate
+tunnel path, not accidental raw port exposure.
+
+## Security Defaults
+
+- Services bind to `127.0.0.1` by default.
+- LAN binding is opt-in and visibly warned in the UI.
+- Daemons reject public bind addresses unless explicitly allowed.
+- Admin APIs support `X-PocketHost-Token` and `Authorization: Bearer`.
+- Token comparison uses a constant-time helper.
+- `/health` stays unauthenticated for local supervision.
+- File and web paths reject traversal and symlink escape.
+- Directory listing is disabled by default.
+- Uploads have a configurable byte cap and atomic commit behavior.
+- Cloudflare credentials are not committed and are copied into app-private
+  storage when imported.
+- Logs are redacted before UI and SQLite storage.
+- SQLite log retention is bounded.
+
+## Repository Layout
 
 ```text
 PocketHost/
-├─ android/                 Android/Kotlin app
-├─ go/                      Go daemon sources
-├─ rust/matrixd/            Matrix adapter placeholder
-├─ scripts/                 build, packaging, local CI scripts
-├─ configs/examples/        sample configs without secrets
-├─ docs/                    architecture, product, threat model, runbooks
-├─ AGENTS.md                what agents should build
-├─ SOUL.md                  engineering identity and taste
-├─ FLYWHEEL.md              how changes ship and get verified
-├─ LICENSE                  Apache-2.0
-└─ NOTICE                   notices and third-party integration rules
+|- android/                 Android app, Compose UI, foreground supervisor
+|- go/                      Go daemon source and tests
+|- rust/matrixd/            Matrix placeholder adapter source
+|- configs/examples/        Safe sample configs without secrets
+|- docs/                    Architecture, product, threat model, runbooks
+|- releases/                Local APK staging area
+|- scripts/                 Build, package, and verification scripts
+|- AGENTS.md                Agent/developer rules for this repo
+|- FLYWHEEL.md              Change and evidence process
+|- SOUL.md                  Product and engineering taste notes
+|- LICENSE                  Apache-2.0
+`- NOTICE                   Third-party integration notes
 ```
 
-## What is implemented
+## Build Requirements
 
-- Compose dashboard/services/network/storage/logs/settings UI with Material 3 theming, status chips, and per-service uptime
-- `hostd` web control panel: aggregated live daemon status plus per-daemon controls (DDNS refresh, file browse/upload/download/delete), token-gated over loopback
-- operator network-exposure toggle (loopback `127.0.0.1` ⇄ `0.0.0.0`), off by default and wired through the daemon bind guard
-- foreground service supervisor
-- boot receiver
-- SQLite log persistence
-- native daemon launcher
-- Android-side daemon health probing with degraded-state reporting
-- Go daemons:
-  - `hostd`
-  - `webd`
-  - `filed`
-  - `proxyd`
-  - `ddnsd`
-- Android daemon packaging paths for `arm64-v8a`, `armeabi-v7a`, `x86`, and `x86_64`
-- Matrix binary slot with a Rust placeholder implementation
-- bundled `cloudflared` binary slot for ARM64, x86, and x86_64 Android builds
-- local CI script, Go unit tests, Go formatting checks, and live daemon health/security verification
-- Flywheel process docs and release evidence rules
-- Android diagnostics bundle creation from Settings
-- Android log redaction and bounded log retention
+Recommended local toolchain:
 
-## What is intentionally not implemented yet
+- JDK 17+
+- Android SDK platform 36
+- Android build tools 36.0.0
+- Android NDK 27+
+- Go 1.23+
+- Gradle wrapper from `android/gradlew`
+- Kotlin is resolved by the Android Gradle plugin; standalone `kotlinc` is useful
+  but not required for the Android build.
 
-- full Matrix homeserver source inside this repo
-- Cloudflare tunnel credential import and public route verification
-- native Nextcloud
-- Google Play release pipeline
-- production update/signature system for daemon bundles
+Set:
 
-## Android packaging model
-
-Daemon executables are packaged as native-library artifacts:
-
-```text
-android/app/src/main/jniLibs/arm64-v8a/libwebd.so
-android/app/src/main/jniLibs/arm64-v8a/libfiled.so
-android/app/src/main/jniLibs/arm64-v8a/libddnsd.so
-android/app/src/main/jniLibs/arm64-v8a/libproxyd.so
-android/app/src/main/jniLibs/arm64-v8a/libhostd.so
-android/app/src/main/jniLibs/arm64-v8a/libmatrixd.so       optional
-android/app/src/main/jniLibs/arm64-v8a/libcloudflared.so
+```bash
+export ANDROID_SDK_ROOT=$HOME/Android/Sdk
+export ANDROID_HOME=$ANDROID_SDK_ROOT
+export ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/27.2.12479018
 ```
 
-The `.so` suffix is an Android packaging mechanism. These files are normal executable daemons launched from `applicationInfo.nativeLibraryDir`.
+## Build And Test
 
-## Build and test
-
-Run local repository checks, Go formatting checks, unit tests, and live daemon health/security verification:
+Run the local repository baseline:
 
 ```bash
 ./scripts/ci-local.sh
 ```
 
-Run live daemon verification only:
+That runs:
 
-```bash
-./scripts/verify-daemons-local.sh
-```
+- Go unit tests.
+- Go formatting check.
+- Local live daemon verification.
+- Shell syntax checks.
+- Basic repository file checks.
 
 Run Go tests directly:
 
@@ -110,43 +236,35 @@ cd go
 go test ./...
 ```
 
-Build Android Go daemons for every configured APK split:
+Build Android Go daemons:
 
 ```bash
 ./scripts/build-go-android.sh all
 ```
 
-You can also build selected ABIs, for example:
+Build the Android debug APKs:
 
 ```bash
-./scripts/build-go-android.sh arm64-v8a
-./scripts/build-go-android.sh x86_64 x86
+cd android
+./gradlew :app:assembleDebug
 ```
 
-The `armeabi-v7a`, `x86`, and `x86_64` ABIs require Android NDK clang wrappers. Install the NDK under `$ANDROID_SDK_ROOT/ndk` or set `ANDROID_NDK_ROOT`.
-
-Build the bundled Android `cloudflared` artifacts from an official upstream checkout:
-
-```bash
-git clone --depth 1 --branch 2026.5.2 https://github.com/cloudflare/cloudflared.git /tmp/cloudflared-2026.5.2
-./scripts/build-cloudflared-android.sh /tmp/cloudflared-2026.5.2 all
-```
-
-Build the Android app from Android Studio by opening `android/`, or from the repository root with the wrapper-backed packaging script:
+Stage local split APK artifacts:
 
 ```bash
 ./scripts/package-android.sh release
 ```
 
-The packaging script runs Gradle and copies split APKs for `arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`, and `universal` into `releases/apk/`. The current release build type is debug-signed for sideload testing; it is not a public release-signing pipeline.
+The current `release` build type is debug-signed and is for sideload testing
+only.
 
-## First Android smoke test
+## First Device Smoke Test
 
-1. Install debug APK on an ARM64 Android device.
+1. Install the debug APK on an Android 10+ device.
 2. Grant notification permission.
-3. Tap **Start all**.
-4. Confirm the persistent notification appears.
-5. Confirm default services are running.
+3. Tap `Start all`.
+4. Confirm the persistent PocketHost notification appears.
+5. Confirm default services show as running.
 6. Probe health endpoints:
 
 ```bash
@@ -156,31 +274,53 @@ adb shell 'toybox wget -qO- http://127.0.0.1:8090/health || true'
 adb shell 'toybox wget -qO- http://127.0.0.1:8088/health || true'
 ```
 
-7. Open Logs screen and confirm daemon output appears.
-8. Tap **Stop all** and confirm services stop.
+7. Open Logs and confirm daemon output appears.
+8. Tap `Stop all` and confirm services stop.
 
-See `docs/runbooks/VERIFY_ANDROID_DEVICE.md`.
+See `docs/runbooks/VERIFY_ANDROID_DEVICE.md` for the fuller checklist.
 
-## Security defaults
+## Definition Of Done
 
-- services bind to `127.0.0.1` by default
-- public exposure is opt-in through a tunnel
-- no Cloudflare credentials in the APK or repo
-- file/host/DDNS admin APIs support token auth through `X-PocketHost-Token` or `Authorization: Bearer`
-- token checks use a constant-time comparison helper
-- daemons refuse non-loopback binds unless `POCKETHOST_ALLOW_PUBLIC_BIND=true` is explicitly set
-- file and web servers reject traversal and symlink escape paths
-- web and file directory listing are disabled by default
-- uploads have configurable byte caps and atomic commit behavior
-- raw network SQL is not part of the MVP
-- Matrix database ownership belongs to the selected Matrix binary
-- Nextcloud is not part of the core app
-- Android logs redact bearer tokens and common secret assignment patterns
+For ordinary code changes:
+
+- `./scripts/ci-local.sh` passes.
+- No secrets are added to code, docs, configs, screenshots, logs, or fixtures.
+- Network behavior remains loopback-first unless a human-approved change says
+  otherwise.
+- Service failures show useful states instead of crashing the app.
+- Docs are updated when behavior, commands, ports, or release status changes.
+
+For Android behavior changes, also collect:
+
+- APK build result.
+- Install evidence on an emulator or physical device.
+- Foreground notification evidence.
+- At least one daemon started from the app.
+- Successful local `/health` probe.
+- Logs visible in the app.
+
+For tunnel, Matrix, Nextcloud, release, or data-migration changes, follow the
+gates in `AGENTS.md` and `FLYWHEEL.md`.
+
+## Roadmap
+
+Near-term:
+
+- Clean up Matrix direction and docs around the selected runtime.
+- Add Android instrumented smoke tests to CI.
+- Collect repeatable emulator/device evidence for APK changes.
+- Improve Cloudflare route verification and named tunnel evidence.
+- Keep Nextcloud isolated and experimental until PHP/runtime validation is solid.
+
+Later:
+
+- Production signing.
+- Signed daemon bundle/update model.
+- Backup and restore flows for Matrix and Nextcloud data.
+- Public release process and release notes.
+- Optional enterprise/device-owner deployment mode.
 
 ## License
 
-PocketHost code and docs are licensed under Apache-2.0. See `LICENSE`, `NOTICE`, and `docs/LICENSE_DECISION.md`.
-
-## Flywheel evidence
-
-The first five implementation turns are recorded in `docs/flywheel/TURNS_001_005.md`. Turns 006-015 are recorded in `docs/flywheel/TURNS_006_015.md`. Turns 016-020 and later are recorded under `docs/flywheel/`.
+PocketHost code and docs are licensed under Apache-2.0. See `LICENSE`, `NOTICE`,
+and `docs/LICENSE_DECISION.md`.

@@ -30,6 +30,7 @@ android/app/src/main/jniLibs/x86_64/libcloudflared.so
 Launch contract:
 
 ```bash
+libcloudflared.so tunnel --url http://127.0.0.1:<port>
 libcloudflared.so tunnel --config "$APP_FILES/config/cloudflared.yml" run
 ```
 
@@ -39,7 +40,14 @@ Required config location:
 /data/data/dev.pockethost/files/config/cloudflared.yml
 ```
 
-The Android supervisor preflights that config path before launch. Missing config is a configuration failure, while missing `libcloudflared.so` is a missing binary failure.
+Quick Tunnel mode does not require an account or credentials. Named Tunnel mode preflights the config path and imported credentials JSON before launch. Missing config is a configuration failure, while missing `libcloudflared.so` is a missing binary failure.
+
+## Android UI behavior
+
+- Quick Tunnel is the default mode and targets one local PocketHost service at a time.
+- The app extracts the latest `trycloudflare.com` URL from `cloudflared` logs and shows it in the Tunnel screen.
+- Named Tunnel credentials are imported with Android's file picker and copied to app-private `config/cloudflared/credentials.json`.
+- Credential JSON must include `AccountTag`, `TunnelID`, and `TunnelSecret`; contents are never logged.
 
 Build command used for the bundled artifacts:
 
@@ -55,6 +63,7 @@ The APK does not include tunnel credentials, tokens, certs, hostnames, or Cloudf
 web.example.com       -> http://127.0.0.1:8080
 files.example.com     -> http://127.0.0.1:8090
 matrix.example.com    -> http://127.0.0.1:6167
+nextcloud.example.com -> http://127.0.0.1:8092
 ```
 
 Do not change default tunnel routing without a human gate. Do not commit credentials, tunnel tokens, generated certs, or dashboard screenshots that expose secrets.
