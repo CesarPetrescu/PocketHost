@@ -15,16 +15,46 @@ case "$VARIANT" in
 esac
 
 if [[ -z "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}" && ! -f "$ANDROID_DIR/local.properties" ]]; then
-  echo "Android SDK location not found. Set ANDROID_HOME/ANDROID_SDK_ROOT or create android/local.properties with sdk.dir before packaging APKs." >&2
-  exit 2
+  if [[ "${POCKETHOST_DISABLE_OFFLINE_APK_FALLBACK:-}" == "1" ]]; then
+    echo "Android SDK location not found. Set ANDROID_HOME/ANDROID_SDK_ROOT or create android/local.properties with sdk.dir before packaging APKs." >&2
+    exit 2
+  fi
+  cat >&2 <<EOF_FALLBACK
+Android SDK location not found. Falling back to offline developer APK staging.
+These fallback APKs are debug-signed native-library carrier artifacts for local
+sideload/dependency checks only; install a complete Android SDK and rerun this
+script for the full Compose supervisor application APKs. Set
+POCKETHOST_DISABLE_OFFLINE_APK_FALLBACK=1 to fail instead.
+EOF_FALLBACK
+  cd "$ROOT_DIR"
+  ./scripts/offline-developer-apks.py "$VARIANT"
+  exit 0
 fi
 
 cd "$ANDROID_DIR"
 TASK="assemble${VARIANT^}"
+set +e
 if [[ -x ./gradlew ]]; then
   ./gradlew ":app:$TASK"
 else
   gradle ":app:$TASK"
+fi
+gradle_status=$?
+set -e
+if [[ "$gradle_status" -ne 0 ]]; then
+  if [[ "${POCKETHOST_DISABLE_OFFLINE_APK_FALLBACK:-}" == "1" ]]; then
+    exit "$gradle_status"
+  fi
+  cat >&2 <<EOF_FALLBACK
+Gradle Android packaging failed. Falling back to offline developer APK staging.
+These fallback APKs are debug-signed native-library carrier artifacts for local
+sideload/dependency checks only; install a complete Android SDK and rerun this
+script for the full Compose supervisor application APKs. Set
+POCKETHOST_DISABLE_OFFLINE_APK_FALLBACK=1 to fail instead.
+EOF_FALLBACK
+  cd "$ROOT_DIR"
+  ./scripts/offline-developer-apks.py "$VARIANT"
+  exit 0
 fi
 
 mkdir -p "$RELEASE_DIR"

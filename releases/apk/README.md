@@ -6,7 +6,7 @@ This directory receives locally generated APKs from:
 ./scripts/package-android.sh release
 ```
 
-Expected split outputs:
+Expected staged developer APKs:
 
 - `pockethost-release-arm64-v8a-release.apk`
 - `pockethost-release-armeabi-v7a-release.apk`
@@ -14,17 +14,11 @@ Expected split outputs:
 - `pockethost-release-x86_64-release.apk`
 - `pockethost-release-universal-release.apk`
 
-These APKs are for developer sideload testing. The current `release` build type
-uses the debug signing configuration and is not suitable for public app-store
-distribution.
+These APKs are local, debug-signed sideload/developer artifacts only. They are
+not public release artifacts and are not Google Play release artifacts.
 
-Before treating any APK here as a candidate release, collect:
-
-- `./scripts/ci-local.sh` output.
-- Android build output.
-- Install evidence on a real device or emulator.
-- Foreground notification evidence.
-- Daemon start/stop evidence.
-- Successful local `/health` probes.
-- Confirmation that no secrets are bundled in configs, assets, logs, or
-  screenshots.
+When Gradle cannot package the full Android app because the Android SDK is
+unavailable, `package-android.sh` falls back to `offline-developer-apks.py`. The
+fallback APKs carry the packaged native daemon artifacts for each ABI and a
+minimal installable manifest. Use a full Android SDK with platform android-36
+and Build Tools 36.x to build the complete Compose supervisor application.

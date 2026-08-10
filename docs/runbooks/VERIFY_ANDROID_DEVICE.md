@@ -4,6 +4,10 @@ Use this runbook before calling an Android change done.
 
 ## Preconditions
 
+- Android SDK path configured with `ANDROID_HOME`, `ANDROID_SDK_ROOT`, or `android/local.properties` containing `sdk.dir=/path/to/android/sdk`.
+- SDK platform `android-36` installed to match the app `compileSdk`.
+- Android Build Tools installed; use Build Tools 36.x when available for this project.
+- Android NDK installed if rebuilding Go daemon artifacts for `armeabi-v7a`, `x86`, or `x86_64`.
 - ARM64 Android phone/tablet
 - APK installed
 - notification permission granted
@@ -30,7 +34,16 @@ From the repository root:
 ```
 
 Use the APK in `releases/apk/` matching the device ABI, or use the universal APK
-for broad sideload compatibility. These are debug-signed developer artifacts.
+for broad sideload compatibility. Expected staged developer APKs are:
+
+- `pockethost-release-arm64-v8a-release.apk`
+- `pockethost-release-armeabi-v7a-release.apk`
+- `pockethost-release-x86-release.apk`
+- `pockethost-release-x86_64-release.apk`
+- `pockethost-release-universal-release.apk`
+
+These APKs are debug-signed sideload/developer artifacts only. Do not treat
+them as public release artifacts without a separate release-signing review.
 
 ### Device smoke test
 
