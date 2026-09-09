@@ -2,7 +2,7 @@ use std::env;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 fn main() {
@@ -35,7 +35,10 @@ fn main() {
         eprintln!("MATRIXD failed to bind {addr}: {err}");
         std::process::exit(1);
     });
-    println!("MATRIXD placeholder listening addr={addr} data_dir={}", data_dir.display());
+    println!(
+        "MATRIXD placeholder listening addr={addr} data_dir={}",
+        data_dir.display()
+    );
 
     for stream in listener.incoming() {
         match stream {
@@ -45,7 +48,7 @@ fn main() {
     }
 }
 
-fn handle(stream: &mut TcpStream, started: Instant, addr: &str, data_dir: &PathBuf) {
+fn handle(stream: &mut TcpStream, started: Instant, addr: &str, data_dir: &Path) {
     let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
     let mut buf = [0u8; 2048];
     let n = match stream.read(&mut buf) {
@@ -88,7 +91,7 @@ fn respond(stream: &mut TcpStream, status: u16, content_type: &str, body: &str) 
         status,
         reason,
         content_type,
-        body.as_bytes().len(),
+        body.len(),
         body
     );
     let _ = stream.write_all(response.as_bytes());

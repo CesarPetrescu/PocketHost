@@ -1,0 +1,17 @@
+# Normalise line endings for text, and make sure nothing ever tries to apply
+# text conversion to the committed native payload.
+* text=auto
+
+*.so       binary
+*.apk      binary
+*.jar      binary
+*.png      binary
+*.zip      binary
+
+*.bat      text eol=crlf
+*.ps1      text eol=crlf
+gradlew    text eol=lf
+*.sh       text eol=lf
+
+# Keep the prebuilt daemon binaries out of diffs and language statistics.
+android/app/src/main/jniLibs/** linguist-generated=true

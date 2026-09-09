@@ -4,6 +4,9 @@
 
 **Turn a spare Android phone or tablet into a small, supervised personal server.**
 
+[![ci](https://github.com/CesarPetrescu/PocketHost/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/CesarPetrescu/PocketHost/actions/workflows/ci.yml)
+[![android](https://github.com/CesarPetrescu/PocketHost/actions/workflows/android.yml/badge.svg?branch=main)](https://github.com/CesarPetrescu/PocketHost/actions/workflows/android.yml)
+[![codeql](https://github.com/CesarPetrescu/PocketHost/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/CesarPetrescu/PocketHost/actions/workflows/codeql.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Platform: Android 10+](https://img.shields.io/badge/Platform-Android_10%2B-3DDC84?logo=android&logoColor=white)](#-getting-started)
 [![Daemons: Go 1.23+](https://img.shields.io/badge/Daemons-Go_1.23%2B-00ADD8?logo=go&logoColor=white)](go/)
@@ -360,6 +363,7 @@ PocketHost/
 | [`docs/PRODUCT_SPEC.md`](docs/PRODUCT_SPEC.md) | Product specification |
 | [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) | Security threat model |
 | [`docs/BUILDING.md`](docs/BUILDING.md) | Detailed build instructions |
+| [`docs/CI.md`](docs/CI.md) | What CI checks, what it deliberately does not, and why |
 | [`docs/CLOUDFLARED.md`](docs/CLOUDFLARED.md) | Cloudflare Tunnel setup |
 | [`docs/MATRIX.md`](docs/MATRIX.md) | Matrix homeserver notes |
 | [`docs/NEXTCLOUD_EXPERIMENTAL.md`](docs/NEXTCLOUD_EXPERIMENTAL.md) | Experimental Nextcloud wrapper |

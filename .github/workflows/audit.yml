@@ -1,0 +1,292 @@
+name: audit
+
+# The lane for checks that are RED TODAY and should stay visible without
+# blocking merges, plus everything too slow or too network-dependent to sit on
+# the pull-request path.
+#
+# Nothing here is a required status check. A red run is the signal: it is
+# measuring the distance between what the repository claims and what it ships.
+# As each area is fixed, promote that job into ci.yml.
+
+on:
+  schedule:
+    # 03:20 UTC daily.
+    - cron: '20 3 * * *'
+  workflow_dispatch:
+  # So a PR that deliberately fixes one of these can prove it.
+  pull_request:
+    paths:
+      - '.github/workflows/audit.yml'
+      - 'scripts/ci/**'
+      - 'NOTICE'
+      - 'android/app/src/main/jniLibs/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audit-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GO_VERSION: '1.26.x'
+
+jobs:
+  # --- what actually ships -----------------------------------------------
+  native-artifacts:
+    name: bundled binary provenance and attribution
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - name: audit jniLibs
+        run: |
+          {
+            echo "### Bundled binary audit"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          set +e
+          ./scripts/ci/audit-artifacts.sh all 2>&1 | tee audit.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          tail -c 60000 audit.log >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: artifact-audit
+          path: audit.log
+          retention-days: 30
+
+  # --- the three ABIs that need the NDK ----------------------------------
+  go-cross-cgo:
+    name: go cross-compile (cgo ABIs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [armeabi-v7a, x86, x86_64]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            go
+            scripts
+          filter: blob:none
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      # These ABIs need external cgo linking through the NDK clang wrapper.
+      # Verified on the runner image rather than on a PR, because a runner NDK
+      # bump is the likely failure mode and that should not block merges.
+      - name: build ${{ matrix.abi }}
+        env:
+          POCKETHOST_JNILIBS_DIR: ${{ runner.temp }}/jniLibs
+          ABI: ${{ matrix.abi }}
+        run: |
+          # ANDROID_NDK_LATEST_HOME is set by the runner image, so it has to be
+          # read here rather than through the `env` expression context.
+          export ANDROID_NDK_ROOT="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_ROOT:-}}"
+          ./scripts/build-go-android.sh "$ABI"
+          ls -l "$POCKETHOST_JNILIBS_DIR/$ABI"
+
+  # --- full lint, not just new findings ----------------------------------
+  go-lint-full:
+    name: go lint (all existing findings)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: go
+          filter: blob:none
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.13.2
+          working-directory: go
+          only-new-issues: false
+
+  go-gosec:
+    name: gosec
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: go
+          filter: blob:none
+      - uses: securego/gosec@deb54465fea23d19a77f037e11e6589021f8501d # v2.29.0
+        with:
+          args: '-no-fail -fmt sarif -out gosec.sarif ./go/...'
+      - uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: gosec.sarif
+          category: gosec
+
+  # --- everything the pull-request lane leaves uncovered ------------------
+  shell-strict:
+    name: shellcheck (all severities)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts
+          filter: blob:none
+      - run: shellcheck -S style scripts/*.sh scripts/ci/*.sh
+
+  powershell:
+    name: PSScriptAnalyzer
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts
+          filter: blob:none
+      # scripts/*.ps1 are the only files in the repo with no automated coverage
+      # of any kind.
+      - name: analyze
+        shell: pwsh
+        run: |
+          Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser -SkipPublisherCheck
+          $r = Invoke-ScriptAnalyzer -Path scripts -Recurse -Severity Error,Warning
+          $r | Format-Table -AutoSize
+          if ($r.Count -gt 0) { throw "PSScriptAnalyzer reported $($r.Count) finding(s)" }
+
+  python-format:
+    name: ruff format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts
+          filter: blob:none
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: |
+          pip install --user ruff==0.15.8
+          ruff format --check --diff scripts/
+
+  workflow-security:
+    name: zizmor
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: .github
+          filter: blob:none
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      # Finds template injection, over-broad permissions and unpinned actions
+      # that actionlint's syntax pass does not look for.
+      - env:
+          # zizmor's online audits (impostor-commit, ref-confusion) resolve refs
+          # through the GitHub API.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pip install --user zizmor==1.30.1
+          zizmor --format sarif .github/workflows > zizmor.sarif || true
+          zizmor --min-severity medium .github/workflows
+      - uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: zizmor.sarif
+          category: zizmor
+
+  # --- supply chain -------------------------------------------------------
+  sbom:
+    name: SBOM
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # An inventory of the 346 MB of third-party binaries the repository
+      # redistributes. Today NOTICE covers 3 of 31 of them.
+      - uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          path: .
+          format: spdx-json
+          artifact-name: pockethost-sbom.spdx.json
+
+  scorecard:
+    name: OSSF Scorecard
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
+        with:
+          results_file: scorecard.sarif
+          results_format: sarif
+      - uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: scorecard.sarif
+          category: scorecard
+
+  # --- is the CI itself binding? ------------------------------------------
+  branch-protection:
+    name: branch protection
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Every gate in ci.yml is advisory while main is unprotected: anyone with
+      # write access can push straight past a red check.
+      # Reading protection state needs a token with administration:read, which
+      # GITHUB_TOKEN cannot be granted. Supply a fine-grained PAT as
+      # BRANCH_PROTECTION_TOKEN to make this assertion binding; without one the
+      # job reports that it could not check rather than guessing.
+      - name: check the default branch is protected
+        env:
+          GH_TOKEN: ${{ secrets.BRANCH_PROTECTION_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          branch="$(gh api "repos/${GITHUB_REPOSITORY}" --jq .default_branch)"
+          if ! state="$(gh api "repos/${GITHUB_REPOSITORY}/branches/${branch}" --jq .protected 2>/dev/null)"; then
+            echo "::warning::could not read protection state for ${branch}; set BRANCH_PROTECTION_TOKEN to make this check binding"
+            echo "### Branch protection: not readable with this token" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "### Default branch \`${branch}\` protected: ${state}" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$state" != "true" ]]; then
+            echo "::error::${branch} has no protection rule, so no CI check is required to merge"
+            exit 1
+          fi

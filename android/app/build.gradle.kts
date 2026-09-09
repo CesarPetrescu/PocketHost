@@ -26,6 +26,27 @@ android {
         }
     }
 
+    // A real release key, supplied by CI or a local developer through the
+    // environment. When it is absent the release build falls back to the debug
+    // key as before, so nothing about the local workflow changes — but a build
+    // signed that way is not distributable: every machine mints a different
+    // debug key, so no two such APKs are upgrade-compatible.
+    val releaseKeystore = System.getenv("POCKETHOST_KEYSTORE")
+        ?.takeIf { it.isNotBlank() && file(it).exists() }
+
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = System.getenv("POCKETHOST_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("POCKETHOST_KEY_ALIAS")
+                keyPassword = System.getenv("POCKETHOST_KEY_PASSWORD")
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
+    }
+
     buildTypes {
         getByName("debug") {
             applicationIdSuffix = ".debug"
@@ -35,8 +56,11 @@ android {
             isMinifyEnabled = false
             // Daemons are launched by name from nativeLibraryDir, so resource/code
             // shrinking is left off until keep rules are verified on-device.
-            // Debug-signed for now: installable for testing, not a Play release.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (releaseKeystore != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 

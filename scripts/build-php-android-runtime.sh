@@ -53,7 +53,7 @@ build_one() {
 
   echo "==> [$abi] assembling runtime"
   prefix="$WORK/$abi/prefix"; rt="$WORK/$abi/runtime"
-  rm -rf "$WORK/$abi"; mkdir -p "$prefix" "$rt/lib" "$rt/extensions"
+  rm -rf "${WORK:?}/${abi:?}"; mkdir -p "$prefix" "$rt/lib" "$rt/extensions"
   ( cd "$prefix"
     for deb in "$TERMUX_SRC"/output/*_${tarch}.deb "$TERMUX_SRC"/output/*_all.deb; do
       case "$deb" in *-static_*|*binutils*|*-cross_*|*doxygen*|*apache2*|*python*|*tk_*|*postgresql*|*coreutils*|*gawk*|*diffutils*|*findutils*|*sed_*|*grep_*|*dialog*|*procps*|*psmisc*|*tar_*|*less_*|*gzip*|*dash_*|*attr_*|*fdisk*|*blk-utils*|*util-linux*) continue;; esac

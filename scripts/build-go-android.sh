@@ -8,7 +8,9 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GO_DIR="$ROOT_DIR/go"
-JNI_DIR="$ROOT_DIR/android/app/src/main/jniLibs"
+# Output root. Defaults to the in-tree jniLibs; CI overrides it so a build
+# never dirties the working tree.
+JNI_DIR="${POCKETHOST_JNILIBS_DIR:-$ROOT_DIR/android/app/src/main/jniLibs}"
 ANDROID_API="${ANDROID_API:-26}"
 ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/Android/Sdk}}"
 NDK_ROOT="${ANDROID_NDK_ROOT:-}"
