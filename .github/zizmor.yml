@@ -1,13 +1,11 @@
 # zizmor policy for this repository.
 #
-# Third-party actions must be hash-pinned: a mutable tag on someone else's
-# repository is exactly the supply-chain shape that has been exploited before.
-# Actions published by GitHub itself keep readable major-version tags, which
-# Dependabot keeps current.
-rules:
-  unpinned-uses:
-    config:
-      policies:
-        actions/*: ref-pin
-        github/*: ref-pin
-        "*": hash-pin
+# Every action is hash-pinned, GitHub's own included: a mutable tag on any
+# repository is the supply-chain shape that has actually been exploited, and a
+# project whose central finding is "the shipped binary is not what NOTICE says"
+# has no business trusting a tag. Dependabot keeps the pins and their trailing
+# version comments current.
+#
+# That is zizmor's default `unpinned-uses` policy, so nothing needs configuring
+# here. This file exists to record the decision.
+rules: {}

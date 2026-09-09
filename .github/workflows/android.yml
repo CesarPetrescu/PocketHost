@@ -28,11 +28,11 @@ jobs:
     timeout-minutes: 45
     steps:
       # Full checkout: the APK genuinely needs the jniLibs payload.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           # AGP 9 requires JDK 17+; Gradle 9.5.1 supports up to Java 25. Pinning
@@ -112,7 +112,7 @@ jobs:
 
       # Debug APKs only: the release variant is signed with the runner's
       # auto-generated debug key and is not installable-upgradeable anywhere.
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: apk-debug
@@ -120,7 +120,7 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
         with:
           name: android-reports

@@ -31,8 +31,7 @@ commit runs the whole workflow twice — once for `push`, once for
 | All lint findings | `audit.yml` → `go-lint-full` |
 | gosec, into the Security tab | `audit.yml` → `go-gosec` |
 | CodeQL `security-and-quality` | `codeql.yml` |
-| `android/arm64` cross-compile | `ci.yml` → `go-cross-android` |
-| `armeabi-v7a` / `x86` / `x86_64` cross-compile (needs the NDK) | `audit.yml` → `go-cross-cgo` |
+| Cross-compile for all four ABIs | `ci.yml` → `go-cross-android` |
 | Live daemon behaviour, 15 assertions | `ci.yml` → `integration` |
 
 CI builds with **Go 1.26.x**, not the `1.23.x` it used to pin. Go supports only
@@ -94,9 +93,10 @@ not been updated since 2023.
 `zizmor` (template injection, over-broad permissions, cache poisoning,
 credential persistence) runs in `audit.yml` and uploads SARIF.
 
-`.github/zizmor.yml` sets the pinning policy: third-party actions must be
-hash-pinned, GitHub's own actions keep readable major tags. Dependabot keeps
-both current.
+Every action is hash-pinned, GitHub's own included — a mutable tag on any
+repository is the supply-chain shape that has actually been exploited, and this
+is zizmor's and OSSF Scorecard's default expectation. Each pin carries a
+trailing version comment; Dependabot keeps both current.
 
 ### The repository itself
 

@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           # 99% of a full checkout is the committed jniLibs payload this job
@@ -45,7 +45,7 @@ jobs:
             go
             scripts
           filter: blob:none
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
           # The module has zero dependencies and therefore no go.sum for the
@@ -92,7 +92,7 @@ jobs:
           awk -v t="$total" 'BEGIN { exit (t >= 45.0) ? 0 : 1 }' \
             || { echo "::error::coverage ${total}% is below the 45% floor"; exit 1; }
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: go-coverage
@@ -104,12 +104,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           sparse-checkout: go
           filter: blob:none
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false
@@ -130,14 +130,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           # only-new-issues diffs against the merge base, which needs history.
           fetch-depth: 0
           sparse-checkout: go
           filter: blob:none
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false
@@ -151,33 +151,40 @@ jobs:
           only-new-issues: true
 
   go-cross-android:
-    name: go cross-compile (android/arm64)
+    name: go cross-compile (${{ matrix.abi }})
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86, x86_64]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           sparse-checkout: |
             go
             scripts
           filter: blob:none
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false
-      # arm64-v8a is the ABI virtually every real device uses and is the only
-      # one that builds with CGO_ENABLED=0, so it needs no NDK. The three cgo
-      # ABIs are exercised nightly in audit.yml.
-      - name: build all six daemons for arm64-v8a
+      # arm64-v8a links statically with CGO_ENABLED=0. The other three need
+      # external cgo linking through the NDK clang wrapper, which the runner
+      # image provides — verified building all four on ubuntu-24.04 before this
+      # was made a gate.
+      - name: build all six daemons for ${{ matrix.abi }}
         env:
           POCKETHOST_JNILIBS_DIR: ${{ runner.temp }}/jniLibs
+          ABI: ${{ matrix.abi }}
         run: |
-          ./scripts/build-go-android.sh arm64-v8a
-          ls -l "$POCKETHOST_JNILIBS_DIR/arm64-v8a"
+          export ANDROID_NDK_ROOT="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_ROOT:-}}"
+          ./scripts/build-go-android.sh "$ABI"
+          ls -l "$POCKETHOST_JNILIBS_DIR/$ABI"
           for d in hostd webd filed ddnsd proxyd nextcloudd; do
-            test -s "$POCKETHOST_JNILIBS_DIR/arm64-v8a/lib$d.so" \
-              || { echo "::error::lib$d.so was not produced"; exit 1; }
+            test -s "$POCKETHOST_JNILIBS_DIR/$ABI/lib$d.so" \
+              || { echo "::error::lib$d.so was not produced for $ABI"; exit 1; }
           done
       # The build must not write into the repository; jniLibs is committed and a
       # build step that touches it makes every future diff unreadable.
@@ -188,14 +195,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           sparse-checkout: |
             go
             scripts
           filter: blob:none
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false
@@ -207,7 +214,7 @@ jobs:
         run: ./scripts/ci/check-repo.sh tree
       # The script cleans up its own tmpdir on exit, so without this the daemon
       # output that explains a failure is gone by the time anyone looks.
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
         with:
           name: daemon-logs
@@ -219,7 +226,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           sparse-checkout: rust
@@ -248,7 +255,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           sparse-checkout: scripts
@@ -268,12 +275,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           sparse-checkout: scripts
           filter: blob:none
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
       - name: ruff
@@ -288,7 +295,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           sparse-checkout: .github
@@ -305,7 +312,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           # Everything except the binary payload: check-repo.sh reads markdown,
@@ -317,7 +324,7 @@ jobs:
             releases
             configs
           filter: blob:none
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
       - run: ./scripts/ci/check-repo.sh all
@@ -327,7 +334,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
@@ -357,7 +364,7 @@ jobs:
             --report-format json \
             --report-path gitleaks-report.json \
             --exit-code 1
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
         with:
           name: gitleaks-report
