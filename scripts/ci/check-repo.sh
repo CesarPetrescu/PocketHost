@@ -7,25 +7,41 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT" || exit 1
 
+# Snapshot of every tracked path, used to resolve references without depending
+# on what the current checkout happens to have materialised.
+TRACKED="$(mktemp)"
+trap 'rm -f "$TRACKED"' EXIT
+git ls-files > "$TRACKED"
+
 FAILED=0
 fail() { printf 'FAIL %s\n' "$*" >&2; FAILED=1; }
 ok()   { printf 'ok   %s\n' "$*"; }
 
 # --- internal markdown links and image paths resolve -------------------------
+# Targets are resolved against the git index, not the working tree, so this is
+# correct under a sparse checkout where most paths are not materialised on disk.
+tracked_path_exists() {
+  local target="$1"
+  grep -qxF "$target" "$TRACKED" && return 0          # a tracked file
+  grep -q "^${target%/}/" "$TRACKED" && return 0      # a tracked directory
+  return 1
+}
+
 check_links() {
-  local bad=0 md target dir
+  local bad=0 md target dir resolved
   while IFS= read -r md; do
     dir="$(dirname "$md")"
-    # ](path) where path is not a URL, anchor, or mailto
+    # ](path) where path is not a URL, an anchor, or mailto
     while IFS= read -r target; do
       [[ -z "$target" ]] && continue
       target="${target%%#*}"
       [[ -z "$target" ]] && continue
       if [[ "$target" = /* ]]; then
-        [[ -e "${ROOT}${target}" ]] || { fail "link $md -> $target"; bad=1; }
+        resolved="${target#/}"
       else
-        [[ -e "$dir/$target" ]] || { fail "link $md -> $target"; bad=1; }
+        resolved="$(realpath -m --relative-to="$ROOT" "$dir/$target")"
       fi
+      tracked_path_exists "$resolved" || { fail "link $md -> $target"; bad=1; }
     done < <(grep -oE '\]\([^)]+\)' "$md" \
              | sed -E 's/^\]\(//; s/\)$//; s/ .*$//' \
              | grep -vE '^(https?:|mailto:|#|tel:)')
@@ -37,9 +53,10 @@ check_links() {
 check_script_refs() {
   local bad=0 ref
   while IFS= read -r ref; do
-    [[ -e "$ref" ]] || { fail "referenced script missing: $ref"; bad=1; }
+    tracked_path_exists "$ref" || { fail "referenced script missing: $ref"; bad=1; }
   done < <(git ls-files '*.md' Makefile \
-           | xargs grep -ohE '(\./)?scripts/[A-Za-z0-9_.-]+\.(sh|ps1|py)' 2>/dev/null \
+           | while IFS= read -r f; do [[ -f "$f" ]] && printf '%s\n' "$f"; done \
+           | xargs -r grep -ohE '(\./)?scripts/[A-Za-z0-9_.-]+\.(sh|ps1|py)' 2>/dev/null \
            | sed 's|^\./||' | sort -u)
   (( bad == 0 )) && ok "every scripts/ path referenced in docs and the Makefile exists"
 }

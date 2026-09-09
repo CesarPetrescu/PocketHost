@@ -7,7 +7,7 @@ Five workflows, split by whether a red result should block a merge.
 | `ci.yml` | push to `main`, every PR | yes | Fast gates. Green on `main` today. |
 | `android.yml` | push to `main`, every PR | yes | Builds the Kotlin app and its APKs. |
 | `codeql.yml` | push, PR, weekly | yes | Static analysis, Go + Kotlin + Python + Rust + Actions. |
-| `audit.yml` | nightly, manual | **no** | Checks that are red today by design. |
+| `audit.yml` | nightly, manual only | **no** | Checks that are red today by design. |
 | `release.yml` | `v*` tag | n/a | Signed release build, SBOM, provenance, draft release. |
 
 `ci.yml` triggers on `push` **only for `main`**. Without that filter every PR
@@ -140,6 +140,33 @@ claims and what `android/app/src/main/jniLibs/` actually contains:
   staging script stages 32.0.11
 
 Promote each of these into `ci.yml` as it is fixed.
+
+`audit.yml` has no `pull_request` trigger on purpose. Running permanently-red
+checks on every PR is how a team learns to ignore a red check. Run it on a
+branch with `workflow_dispatch` to prove a fix before merging.
+
+### Secrets
+
+`gitleaks` scans the full commit history on every PR. `.gitleaks.toml` carries
+one allowlist entry, for the PEM *template* in
+`ServicePreferences.ensureMatrixSigningKey` — it formats a Dendrite signing key
+rather than containing one; the seed comes from `SecureRandom` at runtime.
+
+Two gitleaks 8.24 behaviours that entry depends on, both established by
+planting a real RSA key rather than assumed:
+
+- Only the singular `[allowlist]` table is honoured. The `[[allowlists]]` array
+  form parses cleanly and is then ignored — it reads as an applied allowlist
+  while nothing is exempted.
+- `condition` and `targetRules` are not enforced, and a `paths` entry exempts
+  that file from every rule. A path-scoped allowlist here **did** hide a real
+  private key committed to the same file. The entry therefore matches on secret
+  content only, so a real key in any file — that one included — is still
+  reported.
+
+Re-verify with a planted secret whenever `.gitleaks.toml` changes. The job
+writes a redacted JSON report and uploads it on failure; without one, a failure
+says only `leaks found: 1` and cannot be diagnosed.
 
 ## What is deliberately not covered
 

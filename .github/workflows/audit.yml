@@ -12,14 +12,11 @@ on:
   schedule:
     # 03:20 UTC daily.
     - cron: '20 3 * * *'
+  # Deliberately no `pull_request` trigger. These jobs are red today by
+  # design; running them on every PR would make every PR red and train
+  # reviewers to ignore the colour. Run this on a branch with
+  # `workflow_dispatch` to prove a fix before merging it.
   workflow_dispatch:
-  # So a PR that deliberately fixes one of these can prove it.
-  pull_request:
-    paths:
-      - '.github/workflows/audit.yml'
-      - 'scripts/ci/**'
-      - 'NOTICE'
-      - 'android/app/src/main/jniLibs/**'
 
 permissions:
   contents: read
