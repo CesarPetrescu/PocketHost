@@ -92,8 +92,22 @@ build_one() {
   done
 }
 
+# Building straight into the repo would dirty the working tree partway through,
+# and Go stamps vcs.modified from the tree state at each build. Stage everything
+# outside the repo first, then install in one step, so every ABI is stamped
+# against the same (clean) tree.
+STAGE="$(mktemp -d "${TMPDIR:-/tmp}/pockethost-jnilibs.XXXXXX")"
+trap 'rm -rf "$STAGE"' EXIT
+FINAL_DIR="$JNI_DIR"
+JNI_DIR="$STAGE"
+
 for abi in "${ABIS[@]}"; do
   build_one "$abi"
 done
 
-echo "Done. Binaries written to $JNI_DIR"
+for abi in "${ABIS[@]}"; do
+  mkdir -p "$FINAL_DIR/$abi"
+  cp -f "$STAGE/$abi"/*.so "$FINAL_DIR/$abi/"
+done
+
+echo "Done. Binaries written to $FINAL_DIR"

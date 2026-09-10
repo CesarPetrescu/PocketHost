@@ -139,6 +139,10 @@ check_binary_vulns() {
   command -v govulncheck >/dev/null 2>&1 || { note "govulncheck not installed, skipping"; return; }
   local bad=0 f out
   while IFS= read -r f; do
+    if ! go version -m "$f" >/dev/null 2>&1; then
+      note "$f is not a Go binary; govulncheck cannot read it"
+      continue
+    fi
     out="$(govulncheck -mode=binary "$f" 2>&1)"
     if grep -q 'No vulnerabilities found' <<<"$out"; then
       ok "no known vulnerabilities in $f"
@@ -167,7 +171,18 @@ check_version_drift() {
   (( bad == 0 )) && ok "Nextcloud version constants agree across code, scripts and docs"
 }
 
+# --- emit the SHA256 manifest NOTICE must carry ------------------------------
+# Regenerate NOTICE's manifest after any rebuild:
+#   ./scripts/ci/audit-artifacts.sh manifest
+emit_manifest() {
+  local f
+  while IFS= read -r f; do
+    printf '%s  %s\n' "$(sha256sum "$f" | cut -d" " -f1)" "${f#"$JNI"/}"
+  done < <(git ls-files "$JNI/*.so" | sort)
+}
+
 case "${1:-all}" in
+  manifest)     emit_manifest ;;
   elf)          check_elf ;;
   provenance)   check_go_provenance ;;
   abi)          check_abi_matrix ;;
@@ -184,7 +199,7 @@ case "${1:-all}" in
     check_binary_vulns
     check_version_drift
     ;;
-  *) echo "usage: $0 [elf|provenance|abi|notice|identity|vulns|versions|all]" >&2; exit 2 ;;
+  *) echo "usage: $0 [manifest|elf|provenance|abi|notice|identity|vulns|versions|all]" >&2; exit 2 ;;
 esac
 
 exit "$FAILED"

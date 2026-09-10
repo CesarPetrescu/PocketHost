@@ -126,3 +126,72 @@ jobs:
           name: android-reports
           path: android/app/build/reports/
           retention-days: 7
+
+  # --- rolling nightly APKs ------------------------------------------------
+  # Publishes the APKs the build job just produced — the same bytes that were
+  # linted and tested, not a rebuild — to a rolling `nightly` prerelease, so a
+  # sideloader can grab a current build without a GitHub login or a 7-day
+  # artifact expiry.
+  #
+  # These are DEBUG-signed. Every runner mints its own debug keystore, so two
+  # nightlies are not upgrade-compatible with each other and never with a real
+  # release. Signed, installable-upgradeable builds come from release.yml on a
+  # v* tag, which refuses to publish anything debug-signed.
+  publish-nightly:
+    name: publish rolling nightly
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: apk-debug
+          path: dist
+
+      - name: checksums
+        run: |
+          cd dist
+          sha256sum ./*.apk | tee SHA256SUMS.txt
+
+      # A verifiable statement of which commit and workflow run produced each
+      # APK. This repository ships prebuilt binaries, so provenance is worth
+      # more here than usual.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: 'dist/*.apk'
+
+      - name: publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          short="${GITHUB_SHA:0:7}"
+          {
+            echo "Automatic build of \`main\` at ${short}."
+            echo
+            echo "**These APKs are debug-signed.** Every CI run generates its own"
+            echo "debug key, so you cannot upgrade from one nightly to the next —"
+            echo "uninstall first. They are for trying \`main\`, not for keeping."
+            echo "Signed builds come from a \`v*\` tag."
+            echo
+            echo "Pick the APK matching your device's ABI; \`universal\` works"
+            echo "anywhere but is roughly three times the size."
+            echo
+            echo '```'
+            cat dist/SHA256SUMS.txt
+            echo '```'
+          } > notes.md
+          # Rolling: replace the previous nightly rather than accumulating one
+          # release per commit.
+          gh release delete nightly --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || true
+          gh release create nightly \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Nightly (${short})" \
+            --notes-file notes.md \
+            --prerelease \
+            dist/*.apk dist/SHA256SUMS.txt

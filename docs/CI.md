@@ -5,10 +5,43 @@ Five workflows, split by whether a red result should block a merge.
 | Workflow | Trigger | Blocking? | Purpose |
 |---|---|---|---|
 | `ci.yml` | push to `main`, every PR | yes | Fast gates. Green on `main` today. |
-| `android.yml` | push to `main`, every PR | yes | Builds the Kotlin app and its APKs. |
+| `android.yml` | push to `main`, every PR | yes | Builds the Kotlin app and its APKs; publishes the rolling nightly. |
 | `codeql.yml` | push, PR, weekly | yes | Static analysis, Go + Kotlin + Python + Rust + Actions. |
 | `audit.yml` | nightly, manual only | **no** | Checks that are red today by design. |
 | `release.yml` | `v*` tag | n/a | Signed release build, SBOM, provenance, draft release. |
+
+## Release channels
+
+Two, deliberately different.
+
+**Nightly** — `android.yml` → `publish-nightly`. Every push to `main` replaces a
+rolling `nightly` prerelease with the five APKs the build job just produced.
+They are the exact bytes that were linted and unit-tested in the same job, not a
+rebuild, and each carries an `actions/attest-build-provenance` statement tying
+it to the commit and run that made it. No secrets needed, so this works today.
+
+They are **debug-signed**: every runner mints its own debug keystore, so two
+nightlies are not upgrade-compatible with each other, and never with a real
+release. Uninstall before installing a newer one. The release notes say so.
+
+**Tagged** — `release.yml` on a `v*` tag. Signed with a real key, verified with
+`apksigner`, published as a draft so a human still presses the button. It
+refuses to publish an APK that is debug-signed or carries only a v1 JAR
+signature, and asserts the tag matches `versionName`. It needs the four signing
+secrets listed at the end of this document; without them the job stops rather
+than shipping something unupgradeable.
+
+Both depend on the ABI splits having distinct `versionCode`s. They shared
+`versionCode 1` until `android/app/build.gradle.kts` gave each ABI its own band
+(universal 1, armeabi-v7a 1001, x86 2001, arm64-v8a 3001, x86_64 4001) — a
+store keeps one artifact per `versionCode`, so identical codes made the splits
+mutually unpublishable. 64-bit bands sit above their 32-bit counterparts so a
+device that can run several picks the right one, and universal stays lowest as
+the fallback.
+
+The nightly is gated on `android.yml`'s own build, lint and unit-test steps, not
+on `ci.yml`. Both run on the same push, so a red `ci.yml` is visible next to it,
+but the nightly does not wait for it.
 
 `ci.yml` triggers on `push` **only for `main`**. Without that filter every PR
 commit runs the whole workflow twice — once for `push`, once for
@@ -120,26 +153,35 @@ Run the same set locally with `make check`, or the whole PR-gate suite with
 
 ### The shipped native payload
 
-`scripts/ci/audit-artifacts.sh`, run nightly by `audit.yml`. **This fails
-today.** That is the point — it measures the distance between what `NOTICE`
-claims and what `android/app/src/main/jniLibs/` actually contains:
+`scripts/ci/audit-artifacts.sh`, run nightly by `audit.yml`. It measures the
+distance between what `NOTICE` claims and what
+`android/app/src/main/jniLibs/` actually contains:
 
 - every binary is an ELF matching its ABI directory — passes
 - first-party daemons: correct module, `GOARCH` matches the ABI directory,
-  toolchain at or above the supported floor, `vcs.modified=false` —
-  **24 failures**: all built with go1.23.5 from a modified working tree
-- every declared ABI split ships all six daemons — passes
-- `NOTICE` records a SHA256 for every committed binary — **28 failures**:
-  only cloudflared's three hashes match anything on disk
-- every bundled third-party Go binary is named in `NOTICE` — **2 failures**:
-  `libmatrixd.so` is `github.com/matrix-org/dendrite`, which `NOTICE` describes
-  as Tuwunel v1.7.0 and separately forbids bundling
-- known vulnerabilities in the binaries users actually run — **fails**:
-  50 stdlib vulnerabilities per arm64 daemon
-- Nextcloud version constants agree — **fails**: the app opens 33.0.5, the
-  staging script stages 32.0.11
+  toolchain at or above the supported floor, `vcs.modified=false` — passes
+- every declared ABI split ships all six first-party daemons — passes
+- `NOTICE` records a SHA256 for every committed binary — passes
+- every bundled third-party Go binary is named in `NOTICE` — passes
+- Nextcloud version constants agree across code, scripts and docs — passes
+- known vulnerabilities in the binaries users actually run — **2 failures**,
+  both third-party and both needing an upstream rebuild rather than a change
+  here: `libcloudflared.so` (28) and `libmatrixd.so` (50, a Dendrite snapshot
+  from November 2024 whose dependency graph is stale)
 
-Promote each of these into `ci.yml` as it is fixed.
+Regenerate the `NOTICE` manifest after any rebuild of the daemons:
+
+```
+./scripts/build-go-android.sh all          # needs ANDROID_NDK_ROOT for the cgo ABIs
+./scripts/ci/audit-artifacts.sh manifest   # paste into NOTICE's manifest section
+./scripts/ci/audit-artifacts.sh all        # verify
+```
+
+Build from a clean tree. Go stamps `vcs.modified` from the tree state at build
+time, so uncommitted changes are baked into the artifact and the provenance
+check will reject them.
+
+Promote the remaining rows into `ci.yml` as they are fixed.
 
 `audit.yml` has no `pull_request` trigger on purpose. Running permanently-red
 checks on every PR is how a team learns to ignore a red check. Run it on a

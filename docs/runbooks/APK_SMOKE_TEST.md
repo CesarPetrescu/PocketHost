@@ -20,8 +20,8 @@ Copy-Item app\build\outputs\apk\release\*.apk ..\releases\apk\ -Force
 
 ```powershell
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-[IO.Compression.ZipFile]::OpenRead('releases\apk\app-arm64-v8a-release.apk').Entries.FullName | Select-String 'libmatrixd.so|libnextcloudd.so|libcloudflared.so|nextcloud-server-32.0.11.zip'
-[IO.Compression.ZipFile]::OpenRead('releases\apk\app-x86_64-release.apk').Entries.FullName | Select-String 'libmatrixd.so|libnextcloudd.so|libcloudflared.so|nextcloud-server-32.0.11.zip'
+[IO.Compression.ZipFile]::OpenRead('releases\apk\app-arm64-v8a-release.apk').Entries.FullName | Select-String 'libmatrixd.so|libnextcloudd.so|libcloudflared.so|nextcloud-server-33.0.5.zip'
+[IO.Compression.ZipFile]::OpenRead('releases\apk\app-x86_64-release.apk').Entries.FullName | Select-String 'libmatrixd.so|libnextcloudd.so|libcloudflared.so|nextcloud-server-33.0.5.zip'
 ```
 
 `libphp.so` should only appear after a real Android PHP runtime has been staged.

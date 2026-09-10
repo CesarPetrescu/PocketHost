@@ -52,7 +52,7 @@ Copy-Item D:\PocketHostDeps\tuwunel-v1.7.0\target\x86_64-linux-android\release\t
 
 ## PHP and Nextcloud
 
-Nextcloud Server `v32.0.11` is staged as `D:\PocketHostDeps\nextcloud-v32.0.11\assets\nextcloud-server-32.0.11.zip` and packaged by Gradle from that D: asset directory.
+Nextcloud Server `v33.0.5` is staged as `D:\PocketHostDeps\nextcloud-v33.0.5\assets\nextcloud-server-33.0.5.zip` and packaged by Gradle from that D: asset directory.
 
 `libphp.so` is not staged until a real Android PHP runtime is built with the required SQLite/minimal Nextcloud extensions. Use `scripts/stage-nextcloud-experimental.sh` only after such a runtime exists.
 
