@@ -5,7 +5,7 @@ PocketHost treats Nextcloud as an isolated experimental module, not a core servi
 ## Selected target
 
 ```text
-Nextcloud Server: v32.0.11
+Nextcloud Server: v33.0.5
 Runtime: PHP 8.4 Android build supplied by operator/build pipeline
 Database: SQLite only
 PocketHost service: nextcloudd on 127.0.0.1:8092
@@ -49,8 +49,8 @@ Stop the `nextcloud` service, remove `libphp.so`, remove `libnextcloudd.so` if d
 Implemented in the Android app:
 
 - Experimental Nextcloud tab with explicit testing/minimal warning.
-- App-private first-run installer for `nextcloud-server-32.0.11.zip`.
-- D:-backed Gradle asset source: `D:\PocketHostDeps\nextcloud-v32.0.11\assets`.
+- App-private first-run installer for `nextcloud-server-33.0.5.zip`.
+- D:-backed Gradle asset source: `D:\PocketHostDeps\nextcloud-v33.0.5\assets`.
 - Go supervisor wrapper `nextcloudd` packaged as `libnextcloudd.so` for `arm64-v8a` and `x86_64`.
 - Service registry entry for `nextcloud` on `127.0.0.1:8092`, off by default and excluded from Start All.
 - Cloudflare tunnel route option for `http://127.0.0.1:8092`.

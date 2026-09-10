@@ -171,7 +171,18 @@ check_version_drift() {
   (( bad == 0 )) && ok "Nextcloud version constants agree across code, scripts and docs"
 }
 
+# --- emit the SHA256 manifest NOTICE must carry ------------------------------
+# Regenerate NOTICE's manifest after any rebuild:
+#   ./scripts/ci/audit-artifacts.sh manifest
+emit_manifest() {
+  local f
+  while IFS= read -r f; do
+    printf '%s  %s\n' "$(sha256sum "$f" | cut -d" " -f1)" "${f#"$JNI"/}"
+  done < <(git ls-files "$JNI/*.so" | sort)
+}
+
 case "${1:-all}" in
+  manifest)     emit_manifest ;;
   elf)          check_elf ;;
   provenance)   check_go_provenance ;;
   abi)          check_abi_matrix ;;
@@ -188,7 +199,7 @@ case "${1:-all}" in
     check_binary_vulns
     check_version_drift
     ;;
-  *) echo "usage: $0 [elf|provenance|abi|notice|identity|vulns|versions|all]" >&2; exit 2 ;;
+  *) echo "usage: $0 [manifest|elf|provenance|abi|notice|identity|vulns|versions|all]" >&2; exit 2 ;;
 esac
 
 exit "$FAILED"

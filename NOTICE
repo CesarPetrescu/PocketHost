@@ -5,64 +5,127 @@ This product includes source code and documentation licensed under the Apache Li
 
 Third-party components are not relicensed by this repository. When included, linked, or downloaded by users, they remain under their own licenses and notices.
 
-Bundled third-party binary:
+Every native binary under android/app/src/main/jniLibs/ is listed in the SHA256
+manifest at the end of this file. scripts/ci/audit-artifacts.sh verifies that
+manifest against the committed files, and .github/workflows/audit.yml runs it
+nightly. Regenerate the manifest after any rebuild with:
+
+    ./scripts/ci/audit-artifacts.sh manifest
+
+
+BUNDLED THIRD-PARTY BINARIES
+============================
 
 Component: cloudflared
 Version: 2026.5.2
 Source: https://github.com/cloudflare/cloudflared, tag 2026.5.2, commit 0e84636de9450d9e73c1e28932ed2bd62cb33e10
+Go module: github.com/cloudflare/cloudflared v0.0.0-20260527101536-0e84636de945
 License: Apache-2.0
 Build target:
 - android/arm64-v8a: android/app/src/main/jniLibs/arm64-v8a/libcloudflared.so
-- android/x86: android/app/src/main/jniLibs/x86/libcloudflared.so
-- android/x86_64: android/app/src/main/jniLibs/x86_64/libcloudflared.so
-SHA256:
-- arm64-v8a: 6a4b355fb8af5ab6603f2e18ee1c656315477a1c6dd7b89165e0810e8bfa9630
-- x86: 60be4cbe2299d8f9a060f0c99bfa611d537e43a4c5340278063267597d26f53d
-- x86_64: e77f2c2463262c23f2c238fd904838eeec4afa0cacb3afce8c5f8e387bda7494
+- android/x86:       android/app/src/main/jniLibs/x86/libcloudflared.so
+- android/x86_64:    android/app/src/main/jniLibs/x86_64/libcloudflared.so
+Not present for armeabi-v7a; that split ships no Cloudflare Tunnel feature.
 Modifications: no source modifications; cross-compiled from official source for Android with version/build-time linker metadata.
 
-Important non-vendored integrations:
-- Tuwunel v1.7.0 is the selected Matrix target. PocketHost provides the supervisor/configuration contract and build script, but no Tuwunel binary is bundled until version, source, license, target, SHA256, and modifications are recorded here.
-- Nextcloud Server v32.0.11 is the selected experimental module target. PocketHost provides an isolated wrapper and staging script, but no Nextcloud/PHP runtime payload is bundled until all third-party notices, licenses, targets, SHA256 hashes, and modifications are recorded here.
-- Conduit and Dendrite remain non-default Matrix alternatives. Dendrite requires explicit legal/maintenance review before bundling.
+Component: Dendrite
+Version: v0.0.0-20241125100410-084181332b5c (upstream commit 084181332b5c364e2442d3c98522ad8848bc4d36, 2024-11-25)
+Source: https://github.com/matrix-org/dendrite
+Go module: github.com/matrix-org/dendrite/cmd/dendrite
+License: Apache-2.0 (matrix-org/dendrite at this commit; note that the
+  element-hq/dendrite fork is AGPL-3.0 + commercial and is NOT what is built here)
+Build target:
+- android/arm64-v8a: android/app/src/main/jniLibs/arm64-v8a/libmatrixd.so
+- android/x86_64:    android/app/src/main/jniLibs/x86_64/libmatrixd.so
+Not present for armeabi-v7a or x86; those splits ship no Matrix feature.
+Modifications: no source modifications; cross-compiled for Android and staged
+  under the file name libmatrixd.so, which is the name the supervisor launches.
+  The file name does not indicate the implementation — this is Dendrite, not
+  Tuwunel and not the Rust stub in rust/matrixd/.
+Build script: scripts/build-dendrite-android.sh. That script clones the default
+  branch with no revision pin and honours a DENDRITE_REPO override, so it does
+  not reproduce the committed binary. Pin a revision before relying on it.
+
+Component: PHP
+Version: 8.5.1
+Source: Termux packages build of upstream PHP (https://www.php.net/), staged via
+  scripts/build-php-android-runtime.sh / scripts/fetch-termux-php-runtime.sh
+License: PHP License 3.01
+Build target:
+- android/arm64-v8a: android/app/src/main/jniLibs/arm64-v8a/libphp.so
+- android/x86_64:    android/app/src/main/jniLibs/x86_64/libphp.so
+Modifications: none to PHP itself; packaged as a Termux build.
+Unrecorded dependency licenses: this build declares 27 DT_NEEDED shared
+  libraries (including libreadline.so.8, libgmp.so, libssl.so.3, libcrypto.so.3,
+  libxml2.so.16, libsqlite3.so, libcurl.so, libicu*.so.78), none of which are
+  bundled here and whose licenses are not yet recorded. Some are GPL-family.
+  Record them before shipping a build that actually loads this runtime.
+Known non-functional: RUNPATH is /data/data/com.termux/files/usr/lib and none of
+  the 27 dependencies are present in jniLibs, so this binary cannot load on a
+  device as shipped.
+
+
+FIRST-PARTY BINARIES
+====================
+
+Component: PocketHost daemons (hostd, webd, filed, ddnsd, proxyd, nextcloudd)
+Source: this repository, go/cmd/<name>
+Go module: dev.pockethost/daemons
+License: Apache-2.0
+Toolchain: go1.26.8, -trimpath -ldflags="-s -w"
+Build targets: all four ABIs (arm64-v8a, armeabi-v7a, x86, x86_64)
+Build script: scripts/build-go-android.sh all
+Provenance: each binary is stamped with the git revision it was built from and
+  vcs.modified=false. Verify with `go version -m <file>`.
+
+
+IMPORTANT NON-VENDORED INTEGRATIONS
+===================================
+
+- Nextcloud Server is the selected experimental module target. The version the
+  app installs is set by NextcloudInstaller.VERSION; no Nextcloud payload is
+  committed to this repository. It is downloaded at build/stage time.
+- Tuwunel and Conduit remain alternative Matrix implementations. Neither is
+  bundled. The Matrix binary that ships today is Dendrite, recorded above.
+
+
+SHA256 MANIFEST
+===============
+
+Every file under android/app/src/main/jniLibs/, relative to that directory.
+Generated by `./scripts/ci/audit-artifacts.sh manifest`.
+
+6a4b355fb8af5ab6603f2e18ee1c656315477a1c6dd7b89165e0810e8bfa9630  arm64-v8a/libcloudflared.so
+06c5287bbf6e2b6ab5d64b3df6b24e2dc70a249a95d8ba63dcfe20dbdd300d75  arm64-v8a/libddnsd.so
+b1b77066517131ed59814a1811d2be8d763dd65fd9d7aef152beed760779546b  arm64-v8a/libfiled.so
+e780a82b6d3eee6af99d72a0e4b4d6fbe84ede9dcea2bb13acced5a2bbc91c58  arm64-v8a/libhostd.so
+f66d1de261a802eafc7cc0645b4018df63ae7e164756bd5fc49af4943057feba  arm64-v8a/libmatrixd.so
+aca341231f49c44da331a2528df3011e3f64f72f1ec734616ee3e1e345ae90ff  arm64-v8a/libnextcloudd.so
+713158ec86be5e1a6072e062b4acb1b202f8f6e25f2137e4e7909753f2eed638  arm64-v8a/libphp.so
+4c995a3cdbf924b87350f9cdb62983b701d68db6255fd31f876294dc0a03668e  arm64-v8a/libproxyd.so
+3315661d4b583896527f6ab8d2626d0dadd1fe48c882f4e0e1018d5f6275a643  arm64-v8a/libwebd.so
+1896318d77c795a90d32dd50b1d7afb860c21ffc300cfe255adc5a90558395a4  armeabi-v7a/libddnsd.so
+9dc2e9be9687c9dbb3c20ad4177e2e712ac51174eb2c3baff007eb4b0c37dd10  armeabi-v7a/libfiled.so
+b25cb8faf7cb7223d6f272b8ca188d3d0205608b97fec644fb9c5bb7864b79d5  armeabi-v7a/libhostd.so
+7e22d4d4f0d3e8ee198179fd347dfe66b76905163aba005b960914eac8f0e49c  armeabi-v7a/libnextcloudd.so
+181caf6e241f043c4ff64741d582812cf076e29d80ac5af1104e33327ea82158  armeabi-v7a/libproxyd.so
+62e5e6cbfa860a1f6d9b62ef57de988d062d7184ff6e671d067be5f7849a7ba7  armeabi-v7a/libwebd.so
+60be4cbe2299d8f9a060f0c99bfa611d537e43a4c5340278063267597d26f53d  x86/libcloudflared.so
+ed9c3d6a574051288df004bae04ab58b50d58e2703c45c9bdbf595f1db9f6bfc  x86/libddnsd.so
+512c1d6d833d5ca8da67ef297d011bcf29f73d527cdf3d3210fa751af47f1715  x86/libfiled.so
+8a041175cea560f3ba84986d43b4774dec09cea02f4aead2635930717bd2c1b4  x86/libhostd.so
+ec879fe5eaf75922a0fd5ff3dc20baa061ebff4dc622d1c441812eb9a49d0d99  x86/libnextcloudd.so
+1e55a474478bc1425937e42681a26de24a2cd8da8a6780359cbf345e2946ef39  x86/libproxyd.so
+3b09804e6d6e4b0add9fd9f582adf36e56a4a197416801d4e0c21a9fe8462ae5  x86/libwebd.so
+e77f2c2463262c23f2c238fd904838eeec4afa0cacb3afce8c5f8e387bda7494  x86_64/libcloudflared.so
+ae14e6174c7c80ead2a1c2e87bd92b8cf88f57749e667239d6396452bb227d27  x86_64/libddnsd.so
+2b5d92933dfe12cc2871a0c200c03957614a2268b083b3ecc07b2da91264dbc1  x86_64/libfiled.so
+f3538fdf1aa1539eb440b73158b8317c970330c14707c23d9715d6c18a681e09  x86_64/libhostd.so
+dd33e9647f8e0f81725f580916ccfe5f254d5b6048b306ea423bb5cbb1087eda  x86_64/libmatrixd.so
+6fed08be6bdd52c888afa7e42bc41445fb84aa17431125a7d8c8c11ef6db48fc  x86_64/libnextcloudd.so
+25e7cca75a6dc9649d6f110c5b30642dc5928b33a32ede5d343463c6e3cdb6d9  x86_64/libphp.so
+5db9b4ed6ad577a696e3de1b5018fb33097803fa73bdc4ea61aab2d82af7d592  x86_64/libproxyd.so
+088f22a40c0975219778366758cdd334b63c19b05f8ee5271592152295bfb287  x86_64/libwebd.so
+
 
 The PocketHost name and any future project logos are not granted as trademarks by the Apache-2.0 license unless explicitly stated elsewhere.
-
-Runtime artifact hashes from local Android integration pass (2026-06-04)
----------------------------------------------------------------------
-
-Tuwunel v1.7.0, built from source with Rust/NDK for Android and staged as libmatrixd.so:
-- arm64-v8a: d4e1cbdfed23945f167908a5160746ae085b79f2001d51ce8e0be59d1d7798c5
-- x86_64: 6ef3500050218f572b5e0ef486126a8687b2a45ec5b8ca2996014af0e420753d
-
-PocketHost nextcloudd wrapper, built from local Go source and staged as libnextcloudd.so:
-- arm64-v8a: e49cf9986fb966e1a5985930a847f29070afccfb576805f24d1a919a266f302b
-- x86_64: abacdaac327a71b91f24852d619a2125c6a1a919bde333cf971a5f2d107ceb1a
-
-Nextcloud Server v32.0.11 ZIP payload staged outside the repo under D:\PocketHostDeps and packaged by Gradle as an asset:
-- nextcloud-server-32.0.11.zip: 4f582463f80f63e84d306a2b2cc45ca3318d505939b2d2d4eb135ed5ac909277
-
-PHP Android runtime status:
-- libphp.so is not staged in this pass. Nextcloud remains disabled by preflight until real ARM64 and x86_64 Android PHP runtimes with required SQLite/minimal Nextcloud extensions are available.
-
-PHP runtime build attempt (2026-06-04)
---------------------------------------
-
-Termux-derived source path selected for PHP Android builds:
-- Source tree: D:\PocketHostDeps\termux-packages
-- PHP package source: https://github.com/termux/termux-packages/tree/master/packages/php
-- Stage scripts added for PocketHost runtime packaging.
-
-Build blocker on this Windows host:
-- No Docker executable is installed.
-- WSL is present only as a launcher and has no usable Linux distro.
-- Therefore PHP was not compiled and no libphp.so hash is recorded.
-
-No PHP binaries are bundled from unverified third-party sources.
-
-Updated nextcloudd hashes after PHP-runtime preflight integration (2026-06-04)
-----------------------------------------------------------------------------
-
-PocketHost nextcloudd wrapper rebuilt from local Go source:
-- arm64-v8a: f9827dfddf286f19d633d81e2655b91447b829e9c35393646f06cb9e0f47903b
-- x86_64: 6a0f638366a768ab3d579b278aa090d3a30a6d4666b76df0005406ff912df225

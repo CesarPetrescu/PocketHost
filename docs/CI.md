@@ -120,26 +120,35 @@ Run the same set locally with `make check`, or the whole PR-gate suite with
 
 ### The shipped native payload
 
-`scripts/ci/audit-artifacts.sh`, run nightly by `audit.yml`. **This fails
-today.** That is the point — it measures the distance between what `NOTICE`
-claims and what `android/app/src/main/jniLibs/` actually contains:
+`scripts/ci/audit-artifacts.sh`, run nightly by `audit.yml`. It measures the
+distance between what `NOTICE` claims and what
+`android/app/src/main/jniLibs/` actually contains:
 
 - every binary is an ELF matching its ABI directory — passes
 - first-party daemons: correct module, `GOARCH` matches the ABI directory,
-  toolchain at or above the supported floor, `vcs.modified=false` —
-  **24 failures**: all built with go1.23.5 from a modified working tree
-- every declared ABI split ships all six daemons — passes
-- `NOTICE` records a SHA256 for every committed binary — **28 failures**:
-  only cloudflared's three hashes match anything on disk
-- every bundled third-party Go binary is named in `NOTICE` — **2 failures**:
-  `libmatrixd.so` is `github.com/matrix-org/dendrite`, which `NOTICE` describes
-  as Tuwunel v1.7.0 and separately forbids bundling
-- known vulnerabilities in the binaries users actually run — **fails**:
-  50 stdlib vulnerabilities per arm64 daemon
-- Nextcloud version constants agree — **fails**: the app opens 33.0.5, the
-  staging script stages 32.0.11
+  toolchain at or above the supported floor, `vcs.modified=false` — passes
+- every declared ABI split ships all six first-party daemons — passes
+- `NOTICE` records a SHA256 for every committed binary — passes
+- every bundled third-party Go binary is named in `NOTICE` — passes
+- Nextcloud version constants agree across code, scripts and docs — passes
+- known vulnerabilities in the binaries users actually run — **2 failures**,
+  both third-party and both needing an upstream rebuild rather than a change
+  here: `libcloudflared.so` (28) and `libmatrixd.so` (50, a Dendrite snapshot
+  from November 2024 whose dependency graph is stale)
 
-Promote each of these into `ci.yml` as it is fixed.
+Regenerate the `NOTICE` manifest after any rebuild of the daemons:
+
+```
+./scripts/build-go-android.sh all          # needs ANDROID_NDK_ROOT for the cgo ABIs
+./scripts/ci/audit-artifacts.sh manifest   # paste into NOTICE's manifest section
+./scripts/ci/audit-artifacts.sh all        # verify
+```
+
+Build from a clean tree. Go stamps `vcs.modified` from the tree state at build
+time, so uncommitted changes are baked into the artifact and the provenance
+check will reject them.
+
+Promote the remaining rows into `ci.yml` as they are fixed.
 
 `audit.yml` has no `pull_request` trigger on purpose. Running permanently-red
 checks on every PR is how a team learns to ignore a red check. Run it on a

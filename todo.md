@@ -16,7 +16,7 @@
 
 - Run the in-app PHP runtime installer on x86_64 emulator and ARM64 phone.
 - Run the in-app PHP module self-check and fix missing extensions/config paths.
-- Install the packaged Nextcloud `v32.0.11` payload from the app.
+- Install the packaged Nextcloud `v33.0.5` payload from the app.
 - Start Nextcloud on `127.0.0.1:8092`.
 - Verify `/health` returns OK.
 - Complete SQLite setup through the web UI.

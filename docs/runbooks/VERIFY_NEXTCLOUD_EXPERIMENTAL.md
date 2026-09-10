@@ -4,8 +4,8 @@ Nextcloud support is intentionally experimental/minimal and off by default.
 
 ## Current packaged state
 
-- Nextcloud Server payload: `v32.0.11`
-- Payload location for Gradle packaging: `D:\PocketHostDeps\nextcloud-v32.0.11\assets\nextcloud-server-32.0.11.zip`
+- Nextcloud Server payload: `v33.0.5`
+- Payload location for Gradle packaging: `D:\PocketHostDeps\nextcloud-v33.0.5\assets\nextcloud-server-33.0.5.zip`
 - App install destination: app-private `data/nextcloud/server`
 - Data directory: app-private `data/nextcloud/data`
 - Bind address: `127.0.0.1:8092`
