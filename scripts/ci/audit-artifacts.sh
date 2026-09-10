@@ -139,6 +139,10 @@ check_binary_vulns() {
   command -v govulncheck >/dev/null 2>&1 || { note "govulncheck not installed, skipping"; return; }
   local bad=0 f out
   while IFS= read -r f; do
+    if ! go version -m "$f" >/dev/null 2>&1; then
+      note "$f is not a Go binary; govulncheck cannot read it"
+      continue
+    fi
     out="$(govulncheck -mode=binary "$f" 2>&1)"
     if grep -q 'No vulnerabilities found' <<<"$out"; then
       ok "no known vulnerabilities in $f"
