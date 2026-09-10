@@ -1,3 +1,5 @@
+import com.android.build.api.variant.FilterConfiguration.FilterType.ABI
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -102,4 +104,31 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     debugImplementation("androidx.compose.ui:ui-tooling")
+}
+
+// Every split APK carried the same versionCode, which makes them mutually
+// unpublishable: a store keeps one artifact per versionCode, and a device has
+// no upgrade ordering between them. Offset each ABI into its own band, leaving
+// the universal APK on the base code so it stays the lowest-priority fallback.
+//
+// Ordering matters: a 64-bit device that can run several of these picks the
+// highest versionCode it is compatible with, so arm64-v8a and x86_64 sit above
+// their 32-bit counterparts.
+val abiVersionBands = mapOf(
+    "armeabi-v7a" to 1,
+    "x86" to 2,
+    "arm64-v8a" to 3,
+    "x86_64" to 4,
+)
+
+androidComponents {
+    onVariants { variant ->
+        variant.outputs.forEach { output ->
+            val abi = output.filters.find { it.filterType == ABI }?.identifier
+            val base = output.versionCode.orNull ?: 1
+            if (abi != null) {
+                output.versionCode.set(abiVersionBands.getValue(abi) * 1000 + base)
+            }
+        }
+    }
 }

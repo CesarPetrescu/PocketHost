@@ -5,10 +5,43 @@ Five workflows, split by whether a red result should block a merge.
 | Workflow | Trigger | Blocking? | Purpose |
 |---|---|---|---|
 | `ci.yml` | push to `main`, every PR | yes | Fast gates. Green on `main` today. |
-| `android.yml` | push to `main`, every PR | yes | Builds the Kotlin app and its APKs. |
+| `android.yml` | push to `main`, every PR | yes | Builds the Kotlin app and its APKs; publishes the rolling nightly. |
 | `codeql.yml` | push, PR, weekly | yes | Static analysis, Go + Kotlin + Python + Rust + Actions. |
 | `audit.yml` | nightly, manual only | **no** | Checks that are red today by design. |
 | `release.yml` | `v*` tag | n/a | Signed release build, SBOM, provenance, draft release. |
+
+## Release channels
+
+Two, deliberately different.
+
+**Nightly** — `android.yml` → `publish-nightly`. Every push to `main` replaces a
+rolling `nightly` prerelease with the five APKs the build job just produced.
+They are the exact bytes that were linted and unit-tested in the same job, not a
+rebuild, and each carries an `actions/attest-build-provenance` statement tying
+it to the commit and run that made it. No secrets needed, so this works today.
+
+They are **debug-signed**: every runner mints its own debug keystore, so two
+nightlies are not upgrade-compatible with each other, and never with a real
+release. Uninstall before installing a newer one. The release notes say so.
+
+**Tagged** — `release.yml` on a `v*` tag. Signed with a real key, verified with
+`apksigner`, published as a draft so a human still presses the button. It
+refuses to publish an APK that is debug-signed or carries only a v1 JAR
+signature, and asserts the tag matches `versionName`. It needs the four signing
+secrets listed at the end of this document; without them the job stops rather
+than shipping something unupgradeable.
+
+Both depend on the ABI splits having distinct `versionCode`s. They shared
+`versionCode 1` until `android/app/build.gradle.kts` gave each ABI its own band
+(universal 1, armeabi-v7a 1001, x86 2001, arm64-v8a 3001, x86_64 4001) — a
+store keeps one artifact per `versionCode`, so identical codes made the splits
+mutually unpublishable. 64-bit bands sit above their 32-bit counterparts so a
+device that can run several picks the right one, and universal stays lowest as
+the fallback.
+
+The nightly is gated on `android.yml`'s own build, lint and unit-test steps, not
+on `ci.yml`. Both run on the same push, so a red `ci.yml` is visible next to it,
+but the nightly does not wait for it.
 
 `ci.yml` triggers on `push` **only for `main`**. Without that filter every PR
 commit runs the whole workflow twice — once for `push`, once for
