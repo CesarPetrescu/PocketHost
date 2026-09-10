@@ -13,3 +13,7 @@ android/deps/
 
 # Claude Code local session state
 .claude/
+
+# Python bytecode from scripts/
+__pycache__/
+*.pyc

@@ -1,0 +1,27 @@
+# gitleaks configuration.
+#
+# Two things about gitleaks 8.24 that this file depends on, both verified
+# against a planted RSA key rather than assumed:
+#
+#   1. Only the singular [allowlist] table is honoured. The [[allowlists]]
+#      array form parses without error and is then ignored, which reads as
+#      "allowlist applied" while nothing is exempted.
+#   2. `condition` and `targetRules` are NOT enforced here, and a `paths` entry
+#      exempts that file from every rule. Allowlisting by path would have hidden
+#      a real private key committed to the same file — confirmed by planting
+#      one. So this allowlist matches on secret *content* only.
+#
+# Re-verify with a planted secret whenever this file changes.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = """
+ServicePreferences.ensureMatrixSigningKey formats a Dendrite signing key; it
+does not contain one. The seed is generated at runtime with SecureRandom and
+written to the device filesystem. The regex requires the literal Kotlin
+interpolation placeholder, so any real key — in this file or any other — is
+still reported.
+"""
+regexes = ['''Key-ID: ed25519:\$keyId''']

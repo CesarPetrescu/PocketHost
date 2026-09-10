@@ -7,6 +7,14 @@ TMP="$(mktemp -d "${TMPDIR:-/tmp}/pockethost-verify.XXXXXX")"
 PIDS=()
 TOKEN="verify-token"
 
+# This is a local verification harness. Scrub any real provider credentials from
+# the environment so a machine that happens to have them cannot make live API
+# calls (ddnsd would otherwise PATCH a real DNS record and still exit 0).
+unset CLOUDFLARE_API_TOKEN CLOUDFLARE_ZONE_ID CLOUDFLARE_RECORD_ID CLOUDFLARE_RECORD_NAME
+# The public-bind guard is the first thing asserted below; inheriting the
+# override would turn that assertion into an unbounded foreground listener.
+unset POCKETHOST_ALLOW_PUBLIC_BIND
+
 cleanup() {
   for pid in "${PIDS[@]:-}"; do
     if kill -0 "$pid" >/dev/null 2>&1; then
@@ -14,6 +22,10 @@ cleanup() {
     fi
   done
   wait >/dev/null 2>&1 || true
+  if [[ -n "${POCKETHOST_LOG_DIR:-}" ]]; then
+    mkdir -p "$POCKETHOST_LOG_DIR"
+    cp -r "$TMP/logs/." "$POCKETHOST_LOG_DIR/" 2>/dev/null || true
+  fi
   rm -rf "$TMP"
 }
 trap cleanup EXIT
@@ -26,7 +38,7 @@ for cmd in hostd webd filed proxyd ddnsd; do
   go build -o "$TMP/bin/$cmd" "./cmd/$cmd"
 done
 
-if "$TMP/bin/webd" --addr 0.0.0.0:18180 --data-dir "$TMP/www" >"$TMP/logs/public-bind.log" 2>&1; then
+if timeout 10s "$TMP/bin/webd" --addr 0.0.0.0:18180 --data-dir "$TMP/www" >"$TMP/logs/public-bind.log" 2>&1; then
   echo "webd unexpectedly allowed public bind without override" >&2
   exit 1
 fi

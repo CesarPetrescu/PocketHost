@@ -1,0 +1,48 @@
+version: 2
+
+updates:
+  # The actions in .github/workflows are pinned to major tags. Without this,
+  # a pin silently rots and nobody notices until a deprecated runtime breaks.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies, ci]
+    commit-message:
+      prefix: 'ci'
+
+  # go/ has no external dependencies today; this keeps the go directive and any
+  # future module current.
+  - package-ecosystem: gomod
+    directory: /go
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies, go]
+    commit-message:
+      prefix: 'deps'
+
+  - package-ecosystem: cargo
+    directory: /rust/matrixd
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies, rust]
+    commit-message:
+      prefix: 'deps'
+
+  # Covers the dependencies { } block in android/app/build.gradle.kts.
+  #
+  # Known gap: Dependabot does not update plugin versions declared in a
+  # pluginManagement / plugins block, so the AGP (9.2.0) and Kotlin Compose
+  # (2.3.20) versions in android/build.gradle.kts stay manual. Renovate is the
+  # tool that covers those if that gap starts to matter.
+  - package-ecosystem: gradle
+    directory: /android
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies, android]
+    commit-message:
+      prefix: 'deps'

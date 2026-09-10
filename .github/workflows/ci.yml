@@ -1,15 +1,372 @@
 name: ci
 
+# Pull-request gates. Every job here passes on main today, runs without any
+# repository secret, and needs no network beyond the toolchain download — so a
+# red result always means the commit broke something.
+#
+# Checks that are red today by design (bundled-binary provenance, NOTICE drift,
+# doc drift) live in audit.yml so they stay visible without blocking merges.
+
 on:
+  # `push` is limited to main: without a branch filter every pull-request commit
+  # runs this workflow twice (once for push, once for pull_request).
   push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # go.mod declares `go 1.23` as the language floor. The toolchain CI builds
+  # with must be a *supported* release: Go maintains only the two most recent
+  # minor versions, and 1.23 is past end-of-life — building with it puts 28
+  # known-reachable stdlib vulnerabilities into every artifact.
+  GO_VERSION: '1.26.x'
 
 jobs:
-  go-and-repo-checks:
+  go:
+    name: go build, vet, race, coverage
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          go-version: '1.23.x'
-      - run: ./scripts/ci-local.sh
+          persist-credentials: false
+          # 99% of a full checkout is the committed jniLibs payload this job
+          # never reads. Fetching only what is needed turns a ~110 MB clone
+          # into a ~4 MB one.
+          sparse-checkout: |
+            go
+            scripts
+          filter: blob:none
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          # The module has zero dependencies and therefore no go.sum for the
+          # built-in cache to key on.
+          cache: false
+
+      - name: go build
+        working-directory: go
+        run: go build ./...
+
+      # `go test` only runs a subset of vet. Run the full analyser set.
+      - name: go vet
+        working-directory: go
+        run: go vet ./...
+
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -s -l go)"
+          if [[ -n "$unformatted" ]]; then
+            echo "::error::these files are not gofmt -s clean:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go mod tidy drift
+        working-directory: go
+        run: |
+          cp go.mod go.mod.bak
+          go mod tidy
+          diff -u go.mod.bak go.mod || { echo "::error::go.mod is not tidy"; exit 1; }
+          rm go.mod.bak
+
+      - name: go test (race, no cache)
+        working-directory: go
+        run: go test -race -count=1 -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: coverage floor
+        working-directory: go
+        run: |
+          total="$(go tool cover -func=coverage.out | awk '/^total:/ {print $3}' | tr -d '%')"
+          echo "total statement coverage: ${total}%"
+          echo "### Go coverage: ${total}%" >> "$GITHUB_STEP_SUMMARY"
+          # Ratchet: raise this as coverage improves, never lower it.
+          awk -v t="$total" 'BEGIN { exit (t >= 45.0) ? 0 : 1 }' \
+            || { echo "::error::coverage ${total}% is below the 45% floor"; exit 1; }
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: go-coverage
+          path: go/coverage.out
+          retention-days: 14
+
+  go-vulncheck:
+    name: go vulnerabilities
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: go
+          filter: blob:none
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      # Symbol-level reachability, so it only reports vulnerabilities the code
+      # actually calls. Clean on the supported toolchain; 28 findings on 1.23.
+      - uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
+        with:
+          go-version-input: ${{ env.GO_VERSION }}
+          go-package: ./...
+          work-dir: go
+          # The sparse checkout above is already in place; let the action reuse
+          # it instead of doing its own full clone.
+          repo-checkout: false
+          cache: false
+
+  go-lint:
+    name: go lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # only-new-issues diffs against the merge base, which needs history.
+          fetch-depth: 0
+          sparse-checkout: go
+          filter: blob:none
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.13.2
+          working-directory: go
+          # main carries 8 pre-existing findings (5 errcheck, 2 staticcheck,
+          # 1 unused). Gating only new ones makes this enforceable from day one;
+          # audit.yml reports the full list nightly.
+          only-new-issues: true
+
+  go-cross-android:
+    name: go cross-compile (${{ matrix.abi }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86, x86_64]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            go
+            scripts
+          filter: blob:none
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      # arm64-v8a links statically with CGO_ENABLED=0. The other three need
+      # external cgo linking through the NDK clang wrapper, which the runner
+      # image provides — verified building all four on ubuntu-24.04 before this
+      # was made a gate.
+      - name: build all six daemons for ${{ matrix.abi }}
+        env:
+          POCKETHOST_JNILIBS_DIR: ${{ runner.temp }}/jniLibs
+          ABI: ${{ matrix.abi }}
+        run: |
+          export ANDROID_NDK_ROOT="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_ROOT:-}}"
+          ./scripts/build-go-android.sh "$ABI"
+          ls -l "$POCKETHOST_JNILIBS_DIR/$ABI"
+          for d in hostd webd filed ddnsd proxyd nextcloudd; do
+            test -s "$POCKETHOST_JNILIBS_DIR/$ABI/lib$d.so" \
+              || { echo "::error::lib$d.so was not produced for $ABI"; exit 1; }
+          done
+      # The build must not write into the repository; jniLibs is committed and a
+      # build step that touches it makes every future diff unreadable.
+      - run: ./scripts/ci/check-repo.sh tree
+
+  integration:
+    name: daemon integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            go
+            scripts
+          filter: blob:none
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - name: verify daemons
+        env:
+          POCKETHOST_LOG_DIR: ${{ runner.temp }}/daemon-logs
+        run: ./scripts/verify-daemons-local.sh
+      - name: verification left no residue in the repo
+        run: ./scripts/ci/check-repo.sh tree
+      # The script cleans up its own tmpdir on exit, so without this the daemon
+      # output that explains a failure is gone by the time anyone looks.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: daemon-logs
+          path: ${{ runner.temp }}/daemon-logs
+          retention-days: 7
+
+  rust:
+    name: rust build, test, fmt, clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: rust
+          filter: blob:none
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: rust/matrixd
+      - name: cargo fmt
+        working-directory: rust/matrixd
+        run: cargo fmt --check
+      - name: cargo clippy
+        working-directory: rust/matrixd
+        run: cargo clippy --all-targets --locked -- -D warnings
+      - name: cargo build
+        working-directory: rust/matrixd
+        run: cargo build --release --locked
+      - name: cargo test
+        working-directory: rust/matrixd
+        run: cargo test --locked
+
+  shell:
+    name: shell scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts
+          filter: blob:none
+      # shellcheck is preinstalled on the ubuntu images; the popular wrapper
+      # action has not been updated since 2023.
+      - name: shellcheck
+        run: |
+          shellcheck --version
+          shellcheck -S warning scripts/*.sh scripts/ci/*.sh
+      - name: bash -n
+        run: |
+          for s in scripts/*.sh scripts/ci/*.sh; do bash -n "$s"; done
+
+  python:
+    name: python scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts
+          filter: blob:none
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: ruff
+        run: |
+          pipx install ruff==0.15.8 || pip install --user ruff==0.15.8
+          ruff check scripts/
+      - name: byte-compile
+        run: PYTHONDONTWRITEBYTECODE=1 python -m compileall -q scripts/
+
+  workflows:
+    name: workflow lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github
+          filter: blob:none
+      # There is no official actionlint action; the release download script is
+      # the maintainer's documented CI path.
+      - name: actionlint
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.12/scripts/download-actionlint.bash) 1.7.12
+          ./actionlint -color
+
+  repo:
+    name: repository consistency
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # Everything except the binary payload: check-repo.sh reads markdown,
+          # the Makefile, the hostd web panel and the git index.
+          sparse-checkout: |
+            go
+            docs
+            scripts
+            releases
+            configs
+          filter: blob:none
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+      - run: ./scripts/ci/check-repo.sh all
+
+  secrets:
+    name: secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          sparse-checkout: |
+            go
+            android/app/src/main/java
+            android/app/src/main/res
+            docs
+            scripts
+            configs
+          filter: blob:none
+      # The MIT-licensed CLI: gitleaks-action needs a licence key even for
+      # public repositories.
+      - name: gitleaks
+        run: |
+          curl -fsSL -o gitleaks.tar.gz \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.24.2/gitleaks_8.24.2_linux_x64.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          # --redact keeps secret material out of the log and the report, while
+          # the report still carries rule, file and line — without it a failure
+          # says only "leaks found: 1" and cannot be diagnosed.
+          ./gitleaks detect \
+            --source . \
+            --config .gitleaks.toml \
+            --redact \
+            --no-banner \
+            --report-format json \
+            --report-path gitleaks-report.json \
+            --exit-code 1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
+          retention-days: 7

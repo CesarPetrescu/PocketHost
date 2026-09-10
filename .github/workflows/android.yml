@@ -1,0 +1,128 @@
+name: android
+
+# The Android module is 2,956 lines of Kotlin — a process supervisor, a zip-slip
+# guard, a secret redactor and a YAML config renderer — and nothing in CI has
+# ever compiled it. This workflow builds it.
+#
+# No SDK install step is needed: the ubuntu-24.04 image preinstalls SDK Platform
+# android-36 and Build Tools 36.0.0, which is exactly what compileSdk 36 wants.
+# Never move this to an *-arm runner label: those images ship no Android SDK.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: assemble, lint, unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      # Full checkout: the APK genuinely needs the jniLibs payload.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          # AGP 9 requires JDK 17+; Gradle 9.5.1 supports up to Java 25. Pinning
+          # stops an image whose default JDK moves past 25 from breaking the
+          # Gradle daemon.
+          java-version: '21'
+
+      # Confirms android/gradle/wrapper/gradle-wrapper.jar is a genuine Gradle
+      # release artifact before any code from it executes.
+      - uses: gradle/actions/wrapper-validation@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          # Only main writes the cache; PR jobs read it. Keeps a PR from
+          # poisoning the shared entry.
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: assembleDebug
+        working-directory: android
+        run: ./gradlew --no-daemon :app:assembleDebug
+
+      - name: lint
+        working-directory: android
+        run: ./gradlew --no-daemon :app:lintDebug
+
+      # `lint { abortOnError = false }` in app/build.gradle.kts means the task
+      # above never fails the build. Read the report and decide here instead, so
+      # the setting stays developer-friendly while CI still gates.
+      - name: fail on lint errors
+        working-directory: android
+        run: |
+          report=app/build/reports/lint-results-debug.xml
+          test -f "$report" || { echo "::error::no lint report at $report"; exit 1; }
+          errors=$(grep -c 'severity="Error"' "$report" || true)
+          warnings=$(grep -c 'severity="Warning"' "$report" || true)
+          echo "### Android lint: ${errors} errors, ${warnings} warnings" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$errors" -gt 0 ]]; then
+            grep -o 'id="[^"]*"[^>]*severity="Error"' "$report" | sort -u | head -50
+            echo "::error::Android lint reported ${errors} error(s)"
+            exit 1
+          fi
+
+      - name: unit tests
+        working-directory: android
+        run: ./gradlew --no-daemon :app:testDebugUnitTest
+
+      # There are zero test sources today, so testDebugUnitTest is NO-SOURCE and
+      # silently passes. Say so out loud rather than letting a green check imply
+      # the Kotlin is tested.
+      - name: report test-source coverage
+        working-directory: android
+        run: |
+          if [[ -d app/src/test || -d app/src/androidTest ]]; then
+            echo "### Android tests: sources present" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::android/app has no src/test or src/androidTest — 2,956 lines of Kotlin are unverified"
+            echo "### Android tests: NONE (no src/test, no src/androidTest)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: assembleRelease
+        working-directory: android
+        run: ./gradlew --no-daemon :app:assembleRelease
+
+      # Every split currently carries versionCode 1, so no two of them can be
+      # published to the same track and there is no upgrade ordering. Report the
+      # shape of what was built.
+      - name: APK inventory
+        working-directory: android
+        run: |
+          {
+            echo "### APKs built"
+            echo
+            echo "| APK | size |"
+            echo "|---|---|"
+            find app/build/outputs/apk -name '*.apk' -printf '| %f | %s bytes |\n' | sort
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Debug APKs only: the release variant is signed with the runner's
+      # auto-generated debug key and is not installable-upgradeable anywhere.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: apk-debug
+          path: android/app/build/outputs/apk/debug/*.apk
+          retention-days: 7
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: android-reports
+          path: android/app/build/reports/
+          retention-days: 7
